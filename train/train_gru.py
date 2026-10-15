@@ -202,6 +202,8 @@ def main():
     ap.add_argument('--mask-eps', type=float, default=0.1)
     ap.add_argument('--dist-weight', type=float, default=0.0,
                     help='weight of a cross-entropy loss for a distributional head over the target atoms (0 = off)')
+    ap.add_argument('--sum-weight', type=float, default=0.0,
+                    help='extra MSE on the predicted sum t0 + t1 (the cost-like part; clipped targets; 0 = off)')
     ap.add_argument('--valid-groups', choices=list(VALID_SPLITS), default='none',
                     help='also train on valid.parquet sequences (A = row groups < 937, B = the rest)')
     args = ap.parse_args()
@@ -295,6 +297,12 @@ def main():
                     aux = (((aux_head(top) - A[:, c:c + args.chunk]) ** 2) * v).sum() / (v.sum() * len(top)).clamp_min(1.0)
                     total = loss + args.aux_weight * aux
                     aux_losses.append(aux.item())
+                if args.sum_weight:
+                    ys = Y[:, c + lo:c + args.chunk].clamp(-CLIP, CLIP).sum(-1)
+                    se = (pred[:, lo:].sum(-1) - ys) ** 2
+                    if mw is not None:
+                        se = se * R[:, c + lo:c + args.chunk]
+                    total = total + args.sum_weight * se.mean()
                 if model.dist_head is not None:
                     yc = Y[:, c + lo:c + args.chunk].clamp(-CLIP, CLIP)
                     logits = model.dist_head(top[:, lo:]).unflatten(-1, (2, len(atoms)))
