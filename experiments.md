@@ -227,3 +227,17 @@ Job wunder-tva-tbptt (gru_all_tvA, x_all_tbptt4k_s4000) still running.
 Valid data helps on unseen valid sequences (V2 half B) and does not hurt the train holdout -> the final models train on
 train + all valid. Launched gru_all_tv / gru_all_tv_seed1 (job wunder-tv-final; V1/V2 no longer clean for these,
 judge on V3 + the half-B evidence above, LB as confirmation).
+
+### 2026-10-15: Kaggle job wunder-fut-full (2x T4, full data, paired with gru_all_full = seed 0)
+| name | change | V1 | V2 | V3 | paired delta (V1 / V2 / V3) |
+|---|---|---|---|---|---|
+| gru_all_fut_full | lag head also predicts future targets y[t+100], y[t+300] | **0.6824** | 0.5086 | 0.4474 | **+0.0014 (z 4.0)** / +0.0002 / +0.0008; class 3 0.4308 (best single so far) |
+| gru_all_full_seed2 | seed 2 | 0.6808 | 0.5064 | 0.4466 | -0.0002 / -0.0021 / +0.0000 |
+Seed spread of the full recipe, V1: 0.6810 / 0.6815 / 0.6808 (sd ~0.0004). Future targets: +0.0014 is ~3 sd, but at
+s4000 the gain showed on V2 instead of V1 -> needs a seed-1 replicate before adoption.
+
+### 2026-10-15: next round (user request: aux learning, hidden-state analysis, CNN-GRU)
+Job wunder-probe-cnn: tools/probe_hidden.py on gru_all_full and x_base_s4000 (no aux heads) -- decodability of past /
+future targets, regimes and volatility from the top GRU state vs from the inputs, oracle value of each, residual
+probes (is the head underfit?), class accuracy; and gru_all_cnn = full recipe + causal CNN front-end on the raw block
+(--conv 32 4 1 4 16: 3 dilated layers, 64-row receptive field, +23k params, ~+16% per-row cost).
