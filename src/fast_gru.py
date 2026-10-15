@@ -47,7 +47,9 @@ def pack(state_dicts, atoms=None, alpha=0.0):
 
 @njit(fastmath=True)
 def _matvec(W, x, b, out):
-    out[:] = np.dot(W, x) + b      # BLAS sgemv; ~1.3x faster than explicit loops on the M2
+    np.dot(W, x, out)              # BLAS sgemv into out (no temporaries); ~1.3x faster than explicit loops on the M2
+    for i in range(out.shape[0]):
+        out[i] += b[i]
 
 
 @njit(fastmath=True)

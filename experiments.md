@@ -308,3 +308,11 @@ cell type or aux recipe averages exactly like another seed.** The diversity prem
 
 ### 2026-10-16: LB of ens2_all_tv (train + all valid, 2 numba models)
 **LB 0.6562** (43m36s, 714 MB): +0.0019 over ens2_all_full (0.6543) -> the valid-data gain transfers to test. Current best.
+
+### 2026-10-16: inference profile (M2, one valid sequence, best of 3)
+Kernel us/row: K=1 22.0, K=2 37.6, K=3 54.6 -> ~16.3 per model + ~5.5 fixed (features); solution.predict adds ~4.
+Fix: _matvec wrote np.dot(W, x) + b into temporaries; now sgemv into the output buffer + bias loop (outputs bit-identical
+over 20k rows). New: K=1 20.4, K=2 34.8, K=3 50.6 (~15 per model). ens2_all_tv: 40.1 us/row -> ~41 min projected (was 44).
+A 3-model ensemble now projects to ~56 min (real/projected has been 0.97-1.04) -> possible but tight.
+Job wunder-ens3: gru_all_tv_seed2 (third train+valid model) and the local score of ens3_all_full (seeds 0/1/2) to
+measure the current recipe's 3rd-model gain (old recipe: +0.0009 V1).
