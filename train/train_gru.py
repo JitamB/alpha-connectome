@@ -59,14 +59,24 @@ class Block(nn.Module):
 class GRUModel(nn.Module):
     """Input standardisation (buffers) -> optional linear projection -> stacked GRUs -> head,
     plus an optional linear skip path from the inputs. The projection keeps the first GRU's input
-    weights small (inference cost is bound by weight bytes per row)."""
+    weights small (inference cost is bound by weight bytes per row).
+    Optional causal CNN front-end (conv=(channels, kernel, dilations)): dilated Conv1d + ReLU layers over the
+    standardised raw block (first 112 inputs), concatenated to the projection. Its state is the last
+    R = (kernel - 1) * sum(dilations) raw rows, carried as the last element of the hidden list (zeros at
+    sequence start), so chunked training equals row-by-row streaming."""
 
-    def __init__(self, n_in=112, hidden=128, layers=2, skip=False, proj=0, atoms=0):
+    def __init__(self, n_in=112, hidden=128, layers=2, skip=False, proj=0, atoms=0, conv=None):
         super().__init__()
         self.register_buffer('mean', torch.zeros(n_in))
         self.register_buffer('std', torch.ones(n_in))
         self.proj = nn.Linear(n_in, proj) if proj else None
         first = proj or n_in
+        self.conv, self.conv_ctx = None, 0
+        if conv:
+            ch, k, dils = conv
+            self.conv = nn.ModuleList([nn.Conv1d(112 if i == 0 else ch, ch, k, dilation=d) for i, d in enumerate(dils)])
+            self.conv_ctx = (k - 1) * sum(dils)
+            first += ch
         self.blocks = nn.ModuleList([Block(first if i == 0 else hidden, hidden) for i in range(layers)])
         self.reg_head = nn.Linear(hidden, 2)
         self.skip_head = nn.Linear(n_in, 2) if skip else None
@@ -77,9 +87,20 @@ class GRUModel(nn.Module):
         (+ top GRU output (B, T, H) if return_top, for training-only auxiliary heads)."""
         x = (x - self.mean) / self.std
         z, new = (x if self.proj is None else self.proj(x)), []
+        if self.conv is not None:
+            raw = x[..., :112]
+            buf = torch.zeros_like(raw[:, :self.conv_ctx]) if hidden is None else hidden[-1]
+            c = torch.cat([buf, raw], 1)
+            ctx = c[:, -self.conv_ctx:]
+            c = c.transpose(1, 2)
+            for conv in self.conv:
+                c = torch.relu(conv(c))
+            z = torch.cat([z, c.transpose(1, 2)], -1)
         for i, block in enumerate(self.blocks):
             z, h = block.gru(z, None if hidden is None else hidden[i])
             new.append(h)
+        if self.conv is not None:
+            new.append(ctx)
         pred = self.reg_head(z)
         if self.skip_head is not None:
             pred = pred + self.skip_head(x)
@@ -208,6 +229,8 @@ def main():
                     help='also train on valid.parquet sequences (A = row groups < 937, B = the rest)')
     ap.add_argument('--classes', type=int, nargs='+',
                     help='train and monitor only on these asset classes (splits/train_classes.json), e.g. 3')
+    ap.add_argument('--conv', type=int, nargs='+', metavar=('CHANNELS', 'KERNEL'),
+                    help='causal CNN front-end on the raw block: CHANNELS KERNEL DILATION... (e.g. 32 4 1 4 16)')
     ap.add_argument('--init', help="fine-tune: start from another run's last.pt or best.pt (model incl. normalisation)")
     args = ap.parse_args()
     if args.gpu_features is None:
@@ -236,7 +259,8 @@ def main():
 
     n_in, transform = TRANSFORMS[args.features]
     atoms = torch.tensor(make_atoms())
-    model = GRUModel(n_in, args.hidden, args.layers, args.skip, args.proj, len(atoms) if args.dist_weight else 0)
+    conv = (args.conv[0], args.conv[1], args.conv[2:]) if args.conv else None
+    model = GRUModel(n_in, args.hidden, args.layers, args.skip, args.proj, len(atoms) if args.dist_weight else 0, conv)
     train_only = [g for g in groups if g < VALID_OFFSET]
     stats_groups = sorted(np.random.default_rng(args.seed + 1).choice(train_only, min(64, len(train_only)), replace=False).tolist())
     sample = np.concatenate([(s.X if transform is None else transform(s.X))[WARMUP::10]
