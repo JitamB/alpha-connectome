@@ -218,3 +218,12 @@ Code: train_gru --lag-targets now also takes negative H = future targets y[t+|H|
 Decision (screening dropped from here on, GPU is no longer scarce): future targets get one full-data run
 (gru_all_fut_full, seed 0, paired with gru_all_full), alongside gru_all_full_seed2 for the ensemble pool.
 Job wunder-tva-tbptt (gru_all_tvA, x_all_tbptt4k_s4000) still running.
+
+### 2026-10-15: Kaggle job wunder-tva-tbptt (2x T4)
+| name | change | V1 | V2 | V3 | paired delta |
+|---|---|---|---|---|---|
+| x_all_tbptt4k_s4000 | batch 4 x TBPTT chunk 4000 (same rows per step), s4000 | 0.6794 | 0.5053 | 0.4407 | vs x_all_s4000: +0.0005 (z 1.6) / **+0.0018 (z 5)** / -0.0003; trains 2.75x slower (60k vs 165k rows/s) -> not worth it |
+| gru_all_tvA | full recipe on all train + valid half A (937 seqs, +9.5% data) | (0.6839, half A seen) | | 0.4484 | vs gru_all_full on clean valid half B: V1 +0.0007 (sigma 0.0014) / **V2 +0.0037 (z 3.5)** / V3 +0.0018 (z 1.7) |
+Valid data helps on unseen valid sequences (V2 half B) and does not hurt the train holdout -> the final models train on
+train + all valid. Launched gru_all_tv / gru_all_tv_seed1 (job wunder-tv-final; V1/V2 no longer clean for these,
+judge on V3 + the half-B evidence above, LB as confirmation).
