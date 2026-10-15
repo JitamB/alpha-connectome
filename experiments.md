@@ -241,3 +241,13 @@ Job wunder-probe-cnn: tools/probe_hidden.py on gru_all_full and x_base_s4000 (no
 future targets, regimes and volatility from the top GRU state vs from the inputs, oracle value of each, residual
 probes (is the head underfit?), class accuracy; and gru_all_cnn = full recipe + causal CNN front-end on the raw block
 (--conv 32 4 1 4 16: 3 dilated layers, 64-row receptive field, +23k params, ~+16% per-row cost).
+
+### 2026-10-15: final-type models on train + all valid (Kaggle job wunder-tv-final)
+| name | V1 (seen) | V2 (seen) | V3 | V3 delta vs same-seed train-only model |
+|---|---|---|---|---|
+| gru_all_tv | 0.6871 | 0.5219 | 0.4477 | +0.0011 (z 1.1) |
+| gru_all_tv_seed1 | 0.6881 | 0.5216 | 0.4492 | +0.0009 (z 0.9) |
+V1 rises only ~0.006 although valid is in training (no memorisation, consistent with D1). Packaged
+submissions/ens2_all_tv (both, numba, 43.4 us/row -> ~44 min projected, all checks pass). Expected LB: ens2_all_full
+0.6543 plus the valid-data gain (half-B V2 +0.0037 at +9.5% data; V1 effect not measurable locally).
+Next job wunder-aux1: gru_all_fut_full_seed1 (replicate), gru_all_fut_lw1_full (lag/future-target weight 1.0).
