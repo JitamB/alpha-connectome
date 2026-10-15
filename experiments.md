@@ -164,3 +164,11 @@ as E[|y|y]/E[|y|]); eval_torch --output reg|dist|blend; train_gru --valid-groups
 | x_all_s4000_dist | decoded distributional head as output | 0.6743 | 0.4931 | 0.4313 | worse than regression output |
 | x_all_s4000_blend | average of both | 0.6791 | 0.5018 | 0.4396 | = regression on V1, worse V2/V3 -> use regression output |
 Monitor (holdout[:200]) 0.4405, highest so far. Full-data run gru_all_full (same recipe) launched on the same session.
+
+### 2026-10-15: full-data model with the bundled recipe (Colab)
+| name | V1 | V2 | V3 | delta vs gru_eng_p64_full / vs ens_full_e3_e5 (V1) |
+|---|---|---|---|---|
+| gru_all_full (regression output) | **0.6810** | **0.5085** | **0.4466** | **+0.0096 (z 14) / +0.0068 (z 11)**; V2 +0.0083 / +0.0042; V3 +0.0061 / +0.0014 |
+| gru_all_full_dist / _blend | 0.6774 / 0.6812 | 0.4999 / 0.5071 | 0.4397 / 0.4460 | regression output kept |
+Packaged as submissions/gru_all_full (single model, numba, 24.3 us/row -> ~25 min projected; matches torch to 2e-6).
+Expected LB ~0.652-0.655 (current LB best 0.6459).

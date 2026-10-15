@@ -1,0 +1,1 @@
+runs/gru_all_full/best.pt
