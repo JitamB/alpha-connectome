@@ -316,3 +316,12 @@ over 20k rows). New: K=1 20.4, K=2 34.8, K=3 50.6 (~15 per model). ens2_all_tv: 
 A 3-model ensemble now projects to ~56 min (real/projected has been 0.97-1.04) -> possible but tight.
 Job wunder-ens3: gru_all_tv_seed2 (third train+valid model) and the local score of ens3_all_full (seeds 0/1/2) to
 measure the current recipe's 3rd-model gain (old recipe: +0.0009 V1).
+
+### 2026-10-16: third model (job wunder-ens3)
+| name | V1 | V2 | V3 | note |
+|---|---|---|---|---|
+| ens3_all_full (seeds 0/1/2, train only) | 0.6833 | 0.5119 | 0.4513 | vs ens2_all_full: **+0.0004 (z 3.6) / +0.0005 / +0.0007** -> small but consistent |
+| gru_all_tv_seed2 (train + valid) | (0.6867 seen) | (0.5221 seen) | 0.4476 | V3 vs gru_all_full_seed2 +0.0010 (same as seeds 0/1) |
+Packaged submissions/ens3_all_tv (3 train+valid models): all correctness checks pass; 53.7 us/row -> **~55 min projected**
+(fails only our own 48-min safety threshold; real/projected has been 0.99-1.04 -> 54-57 min of the 60-min limit).
+Expected LB ~ 0.6562 + 0.0004.
