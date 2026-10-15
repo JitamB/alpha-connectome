@@ -191,10 +191,21 @@ Local score (Kaggle job wunder-eval-ens2): **V1 0.6829 / V2 0.5114 / V3 0.4506**
 **LB 0.6543** (44m52s, 710 MB): +0.0021 over 0.6522; gap V1 - LB 0.0286 (same as before).
 Per-class V1 of ens2: c0 0.798, c1 0.765, c2 0.726, **c3 0.430**.
 
-### 2026-10-15: class-3 specialist (Kaggle job wunder-c3ft, 2x T4) -- running
+### 2026-10-15: class-3 specialist (Kaggle job wunder-c3ft, 2x T4, ~45 min)
 Fine-tune each full model on class-3 train sequences only (4.2k seqs, 2 epochs, lr 3e-4, same recipe; monitor on
 class-3 holdout seqs), then route class-3 sequences to the specialist (class known from the warm-up rows).
 c3ft_s0 from gru_all_full/last.pt (heads restored), c3ft_s1 from gru_all_full_seed1/best.pt (training heads fresh),
 plus eval of their average. Scored with tools/route_moments.py (true class labels) vs ens2_all_full.
 Prior is modest: h384 (8x capacity) left class 3 unchanged, so a gain would have to come from removing
 interference between classes, not from capacity.
+
+| name | class-3 V1 (base -> specialist) | routed V1 / V2 / V3 | paired delta vs base (V1 / V2 / V3) |
+|---|---|---|---|
+| route_c3ft_s0 (gru_all_full; c3 -> c3ft_s0) | 0.4276 -> 0.4276 | 0.6810 / 0.5085 / 0.4471 | +0.0000 / +0.0001 / +0.0006 |
+| route_c3ft_s1 (seed1; c3 -> c3ft_s1) | 0.4279 -> 0.4296 | 0.6820 / 0.5083 / 0.4482 | +0.0005 V1 |
+| route_c3ft_avg (ens2; c3 -> avg of both) | 0.4298 -> 0.4312 | 0.6833 / 0.5116 / 0.4510 | **+0.0004 (z 1.0) / +0.0003 / +0.0005** |
+Specialists lose 0.01-0.03 on the other classes (as expected) and gain nothing on class 3 -> **class 3 is not limited
+by interference between classes** (nor by capacity, h384). Not deployed.
+Per-class affine calibration of ens2 (scale + offset per class, fitted on valid half A from the saved moments):
++0.0003 on half B, -0.0010 V3 -> calibration is already right; dead end.
+Code: train_gru --lag-targets now also takes negative H = future targets y[t+|H|] (training-only head), not yet run.

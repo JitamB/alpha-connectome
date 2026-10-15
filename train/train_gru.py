@@ -196,7 +196,7 @@ def main():
                     help='weight of the auxiliary future-i0-change loss (training only; 0 = off)')
     ap.add_argument('--aux-horizons', type=int, nargs='+', default=[10, 100])
     ap.add_argument('--lag-targets', type=int, nargs='+', default=[],
-                    help='training-only head predicting the realised past targets y[t-H] for each H')
+                    help='training-only head predicting the realised past targets y[t-H] for each H (H < 0: future targets)')
     ap.add_argument('--lag-weight', type=float, default=0.0)
     ap.add_argument('--mask-model', help='models/mask_mlp.pt: weight rows by eps + p(is_scored) (wmse, eng only)')
     ap.add_argument('--mask-eps', type=float, default=0.1)
@@ -296,8 +296,9 @@ def main():
             if mw is not None:
                 with torch.no_grad():
                     R = args.mask_eps + mask_prob(X, mw)
-            if lag_head is not None:  # (B, T, 2 * n_lags) clipped y[t-H], zero (and zero weight) for t < H
-                YL = torch.cat([torch.cat([torch.zeros_like(Y[:, :h]), Y[:, :-h]], 1) for h in args.lag_targets], -1).clamp(-CLIP, CLIP)
+            if lag_head is not None:  # (B, T, 2 * n_lags) clipped y[t-H] (H < 0: future y[t+|H|]), zero (and zero weight) off the ends
+                YL = torch.cat([torch.cat([torch.zeros_like(Y[:, :h]), Y[:, :-h]], 1) if h > 0 else
+                                torch.cat([Y[:, -h:], torch.zeros_like(Y[:, :-h])], 1) for h in args.lag_targets], -1).clamp(-CLIP, CLIP)
             hidden = None
             for c in range(0, X.shape[1], args.chunk):
                 pred, hidden, top = model(X[:, c:c + args.chunk], hidden, return_top=True)
