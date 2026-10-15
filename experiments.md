@@ -172,3 +172,11 @@ Monitor (holdout[:200]) 0.4405, highest so far. Full-data run gru_all_full (same
 | gru_all_full_dist / _blend | 0.6774 / 0.6812 | 0.4999 / 0.5071 | 0.4397 / 0.4460 | regression output kept |
 Packaged as submissions/gru_all_full (single model, numba, 24.3 us/row -> ~25 min projected; matches torch to 2e-6).
 Expected LB ~0.652-0.655 (current LB best 0.6459).
+
+### 2026-10-15: capacity with the new recipe (Kaggle job x-all-h384-s4000, 1x T4, ~116k rows/s, ~50 min)
+| name | change vs x_all_s4000 | V1 | V2 | V3 | paired delta (V1 / V2 / V3) |
+|---|---|---|---|---|---|
+| x_all_h384_s4000 | hidden 384 / proj 192 (8x params), same recipe | 0.6784 | 0.5036 | 0.4419 | -0.0004 / +0.0001 / +0.0009 -> **no gain; every class unchanged (c3 0.4242 vs 0.4254)** |
+Capacity is ruled out for good (h192 and h384, old and new recipe). No teacher/distillation.
+Kaggle note: the CLI's stored OAuth login stops working for API calls; kaggle/push.sh now exports a fresh
+KAGGLE_API_TOKEN from `kaggle auth print-access-token`.

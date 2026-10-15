@@ -5,6 +5,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 K=~/.local/bin/kaggle; USER=jitamb; SLUG=$1; shift
+# The CLI's stored OAuth login stops working for API calls after a while; a freshly printed token still works.
+export KAGGLE_API_TOKEN=$($K auth print-access-token 2>/dev/null | tail -1)
 B=$(mktemp -d)
 mkdir -p $B/data $B/kernel
 tar czf $B/data/code.tgz src/data.py src/evaluate.py src/features.py train/train_gru.py train/gpu_features.py \
