@@ -209,3 +209,12 @@ by interference between classes** (nor by capacity, h384). Not deployed.
 Per-class affine calibration of ens2 (scale + offset per class, fitted on valid half A from the saved moments):
 +0.0003 on half B, -0.0010 V3 -> calibration is already right; dead end.
 Code: train_gru --lag-targets now also takes negative H = future targets y[t+|H|] (training-only head), not yet run.
+
+### 2026-10-15: Kaggle job wunder-fut-maskeps (2x T4, s4000, vs x_all_s4000)
+| name | change | V1 | V2 | V3 | paired delta (V1 / V2 / V3; V1 half B) |
+|---|---|---|---|---|---|
+| x_all_fut_s4000 | lag head also predicts future targets y[t+100], y[t+300] | 0.6790 | 0.5049 | 0.4417 | +0.0001 / **+0.0014 (z 3.5)** / +0.0007; half B +0.0003 -> flat on V1 |
+| x_all_eps03_s4000 | mask eps 0.1 -> 0.03 | 0.6787 | 0.5014 | 0.4384 | -0.0002 / **-0.0022 (z -6)** / -0.0026 -> drop; mask weighting is saturated |
+Decision (screening dropped from here on, GPU is no longer scarce): future targets get one full-data run
+(gru_all_fut_full, seed 0, paired with gru_all_full), alongside gru_all_full_seed2 for the ensemble pool.
+Job wunder-tva-tbptt (gru_all_tvA, x_all_tbptt4k_s4000) still running.
