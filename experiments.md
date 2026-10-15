@@ -305,3 +305,6 @@ spread (~+0.0012 V1) in two seeds.
 Pair gain over the mean of its two singles: seed pair +0.0017, GRU+LSTM +0.0018, GRU+fut-GRU +0.0015 -> **a different
 cell type or aux recipe averages exactly like another seed.** The diversity premise fails: no LSTM kernel work.
 (pair_s0_s2 / pair_s0_cnn hit CUDA OOM running concurrently on one GPU; not needed for the decision.)
+
+### 2026-10-16: LB of ens2_all_tv (train + all valid, 2 numba models)
+**LB 0.6562** (43m36s, 714 MB): +0.0019 over ens2_all_full (0.6543) -> the valid-data gain transfers to test. Current best.
