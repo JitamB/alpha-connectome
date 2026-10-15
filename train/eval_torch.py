@@ -24,7 +24,8 @@ def load(run: Path, weights: str, device):
     cfg = json.loads((run / 'config.json').read_text())
     atoms = len(make_atoms()) if cfg.get('dist_weight') else 0
     conv = (cfg['conv'][0], cfg['conv'][1], cfg['conv'][2:]) if cfg.get('conv') else None
-    model = GRUModel(TRANSFORMS[cfg['features']][0], cfg['hidden'], cfg['layers'], cfg['skip'], cfg.get('proj', 0), atoms, conv)
+    model = GRUModel(TRANSFORMS[cfg['features']][0], cfg['hidden'], cfg['layers'], cfg['skip'], cfg.get('proj', 0), atoms, conv,
+                     cfg.get('cell', 'gru'))
     model.load_state_dict(torch.load(run / weights, map_location=device))
     return model.to(device).eval(), cfg['features'] == 'eng'
 

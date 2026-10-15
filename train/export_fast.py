@@ -30,7 +30,8 @@ if __name__ == '__main__':
     sds = []
     for run in args.runs:
         cfg = json.loads((run / 'config.json').read_text())
-        assert cfg['features'] == 'eng' and cfg['layers'] == 2 and cfg['skip'] and cfg.get('proj') and not cfg.get('conv'), \
+        assert cfg['features'] == 'eng' and cfg['layers'] == 2 and cfg['skip'] and cfg.get('proj') and not cfg.get('conv') \
+            and cfg.get('cell', 'gru') == 'gru', \
             f'{run}: unsupported architecture'
         sds.append({k: v.numpy() for k, v in torch.load(run / args.weights, map_location='cpu').items()})
     out = ROOT / 'submissions' / args.name

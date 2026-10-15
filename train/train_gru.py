@@ -51,9 +51,17 @@ def decode_dist(logits, atoms):
 
 
 class Block(nn.Module):
-    def __init__(self, n_in, hidden):
+    """One recurrent layer: GRU (attribute name kept for existing checkpoints) or LSTM (state = (h, c) tuple)."""
+
+    def __init__(self, n_in, hidden, cell='gru'):
         super().__init__()
-        self.gru = nn.GRU(n_in, hidden, batch_first=True)
+        if cell == 'lstm':
+            self.lstm = nn.LSTM(n_in, hidden, batch_first=True)
+        else:
+            self.gru = nn.GRU(n_in, hidden, batch_first=True)
+
+    def forward(self, z, h):
+        return self.lstm(z, h) if hasattr(self, 'lstm') else self.gru(z, h)
 
 
 class GRUModel(nn.Module):
@@ -65,7 +73,7 @@ class GRUModel(nn.Module):
     R = (kernel - 1) * sum(dilations) raw rows, carried as the last element of the hidden list (zeros at
     sequence start), so chunked training equals row-by-row streaming."""
 
-    def __init__(self, n_in=112, hidden=128, layers=2, skip=False, proj=0, atoms=0, conv=None):
+    def __init__(self, n_in=112, hidden=128, layers=2, skip=False, proj=0, atoms=0, conv=None, cell='gru'):
         super().__init__()
         self.register_buffer('mean', torch.zeros(n_in))
         self.register_buffer('std', torch.ones(n_in))
@@ -77,7 +85,7 @@ class GRUModel(nn.Module):
             self.conv = nn.ModuleList([nn.Conv1d(112 if i == 0 else ch, ch, k, dilation=d) for i, d in enumerate(dils)])
             self.conv_ctx = (k - 1) * sum(dils)
             first += ch
-        self.blocks = nn.ModuleList([Block(first if i == 0 else hidden, hidden) for i in range(layers)])
+        self.blocks = nn.ModuleList([Block(first if i == 0 else hidden, hidden, cell) for i in range(layers)])
         self.reg_head = nn.Linear(hidden, 2)
         self.skip_head = nn.Linear(n_in, 2) if skip else None
         self.dist_head = nn.Linear(hidden, 2 * atoms) if atoms else None
@@ -97,7 +105,7 @@ class GRUModel(nn.Module):
                 c = torch.relu(conv(c))
             z = torch.cat([z, c.transpose(1, 2)], -1)
         for i, block in enumerate(self.blocks):
-            z, h = block.gru(z, None if hidden is None else hidden[i])
+            z, h = block(z, None if hidden is None else hidden[i])
             new.append(h)
         if self.conv is not None:
             new.append(ctx)
@@ -233,6 +241,7 @@ def main():
                     help='train and monitor only on these asset classes (splits/train_classes.json), e.g. 3')
     ap.add_argument('--conv', type=int, nargs='+', metavar=('CHANNELS', 'KERNEL'),
                     help='causal CNN front-end on the raw block: CHANNELS KERNEL DILATION... (e.g. 32 4 1 4 16)')
+    ap.add_argument('--cell', choices=['gru', 'lstm'], default='gru', help='recurrent cell of every layer')
     ap.add_argument('--init', help="fine-tune: start from another run's last.pt or best.pt (model incl. normalisation)")
     args = ap.parse_args()
     if args.gpu_features is None:
@@ -262,7 +271,8 @@ def main():
     n_in, transform = TRANSFORMS[args.features]
     atoms = torch.tensor(make_atoms())
     conv = (args.conv[0], args.conv[1], args.conv[2:]) if args.conv else None
-    model = GRUModel(n_in, args.hidden, args.layers, args.skip, args.proj, len(atoms) if args.dist_weight else 0, conv)
+    model = GRUModel(n_in, args.hidden, args.layers, args.skip, args.proj, len(atoms) if args.dist_weight else 0, conv,
+                     args.cell)
     train_only = [g for g in groups if g < VALID_OFFSET]
     stats_groups = sorted(np.random.default_rng(args.seed + 1).choice(train_only, min(64, len(train_only)), replace=False).tolist())
     sample = np.concatenate([(s.X if transform is None else transform(s.X))[WARMUP::10]
@@ -333,7 +343,7 @@ def main():
             hidden = None
             for c in range(0, X.shape[1], args.chunk):
                 pred, hidden, top = model(X[:, c:c + args.chunk], hidden, return_top=True)
-                hidden = [h.detach() for h in hidden]
+                hidden = [tuple(t.detach() for t in h) if isinstance(h, tuple) else h.detach() for h in hidden]
                 lo = max(0, WARMUP - c)
                 if mw is None:
                     loss = LOSSES[args.loss](pred[:, lo:], Y[:, c + lo:c + args.chunk])
