@@ -251,3 +251,33 @@ V1 rises only ~0.006 although valid is in training (no memorisation, consistent 
 submissions/ens2_all_tv (both, numba, 43.4 us/row -> ~44 min projected, all checks pass). Expected LB: ens2_all_full
 0.6543 plus the valid-data gain (half-B V2 +0.0037 at +9.5% data; V1 effect not measurable locally).
 Next job wunder-aux1: gru_all_fut_full_seed1 (replicate), gru_all_fut_lw1_full (lag/future-target weight 1.0).
+
+### 2026-10-15: hidden-state probes (tools/probe_hidden.py, valid seqs 0-599, every 20th row, 2-fold by sequence)
+Held-out corr of a ridge decode of each quantity from the top GRU state h vs from the 672 inputs at t:
+| quantity | gru_all_full h | x_base_s4000 h (no aux heads) | inputs | oracle WP gain if known exactly (gru_all_full) |
+|---|---|---|---|---|
+| y[t-1] / y[t-10] / y[t-30] | 0.43 / 0.46 / 0.56 | 0.38 / 0.41 / 0.47 | 0.40 / 0.43 / 0.47 | +0.30 / +0.26 / +0.19 |
+| y[t-100] / y[t-300] (lag-head targets) | **0.72 / 0.80** | 0.48 / 0.35 | 0.48 / 0.33 | +0.065 / +0.004 |
+| y[t-1000] / y[t-3000] | 0.22 / 0.18 | 0.22 / 0.17 | 0.23 / 0.18 | -0.010 / -0.010 |
+| y[t+10] / y[t+100] / y[t+300] | 0.30 / 0.20 / 0.18 | 0.27 / 0.18 / 0.17 | 0.28 / 0.18 / 0.17 | - |
+| mean y over last 100 / 1000 | 0.63 / 0.69 | 0.52 / 0.53 | 0.53 / 0.52 | +0.19 / +0.036 |
+| future mean abs(y) over 100 / abs(y) | 0.25 / 0.37 | 0.22 / 0.32 | 0.24 / 0.33 | +0.051 / - |
+| sequence mean of y (regime) | 0.77 | 0.74 | 0.76 | +0.005 |
+| asset class (accuracy) | 0.9998 | 0.979 | - | - |
+Residual probes on h (ridge, MLP; also with raw inputs), WP gain on held-out: -0.011 to -0.024 for both models.
+Reading:
+- **The readout is not underfit**: no extra signal for the current target is extractable from h. Gains must come from
+  changing what h encodes (objectives / inputs), not from a bigger head.
+- Aux heads reshape the state strongly: the lag head lifts the y[t-100] / y[t-300] decode from 0.48 / 0.35 to 0.72 / 0.80.
+  Without explicit targets the GRU state holds little beyond the engineered inputs (decode h ~= inputs).
+- Past-target value decays with the lag: large for k <= 30 (the target windows overlap with y[t]; mostly unrealised
+  future, so unknowable), +0.065 at 100, ~0 from 300 on. Our lag-300 target carries almost no direct value; the 30-100
+  zone (and the past-100 mean, +0.19, decode 0.63) is where the value is and where the state is weaker.
+- The regime (sequence mean) and the class are already known; future volatility is barely decodable (0.25) by either.
+
+### 2026-10-15: CNN-GRU (gru_all_cnn, full recipe + --conv 32 4 1 4 16, seed 0)
+V1 0.6804 / V2 0.5069 / V3 0.4461; vs gru_all_full -0.0006 / **-0.0016 (z -3.1)** / -0.0005 -> learned 64-row filters on
+the raw inputs find nothing the engineered features miss (matches D2). Dropped; no kernel work.
+
+### Next: job wunder-aux2 (both paired with gru_all_fut_full, seed 0)
+gru_all_fut_mid_full (lags 30 60 100 300 + future 100 300) and gru_all_fut_pmean_full (+ past-mean targets over 100 / 1000).

@@ -219,6 +219,8 @@ def main():
     ap.add_argument('--lag-targets', type=int, nargs='+', default=[],
                     help='training-only head predicting the realised past targets y[t-H] for each H (H < 0: future targets)')
     ap.add_argument('--lag-weight', type=float, default=0.0)
+    ap.add_argument('--pmean-targets', type=int, nargs='+', default=[],
+                    help='extra lag-head outputs: mean of the clipped targets over [t-W, t) for each W')
     ap.add_argument('--mask-model', help='models/mask_mlp.pt: weight rows by eps + p(is_scored) (wmse, eng only)')
     ap.add_argument('--mask-eps', type=float, default=0.1)
     ap.add_argument('--dist-weight', type=float, default=0.0,
@@ -273,7 +275,8 @@ def main():
     mids = (atoms[1:] + atoms[:-1]) / 2
     aux_head = nn.Linear(args.hidden, len(AUX_COLS) * len(args.aux_horizons)).to(device) if args.aux_weight else None
     aux_std = None
-    lag_head = nn.Linear(args.hidden, 2 * len(args.lag_targets)).to(device) if args.lag_weight and args.lag_targets else None
+    n_lag = len(args.lag_targets) + len(args.pmean_targets)
+    lag_head = nn.Linear(args.hidden, 2 * n_lag).to(device) if args.lag_weight and n_lag else None
     mw = {k: v.to(device) for k, v in torch.load(args.mask_model).items()} if args.mask_model else None
     if args.init:  # last.pt restores the training heads too; a plain best.pt leaves them freshly initialised
         ck = torch.load(args.init, map_location=device, weights_only=False)
@@ -323,6 +326,10 @@ def main():
             if lag_head is not None:  # (B, T, 2 * n_lags) clipped y[t-H] (H < 0: future y[t+|H|]), zero (and zero weight) off the ends
                 YL = torch.cat([torch.cat([torch.zeros_like(Y[:, :h]), Y[:, :-h]], 1) if h > 0 else
                                 torch.cat([Y[:, -h:], torch.zeros_like(Y[:, :-h])], 1) for h in args.lag_targets], -1).clamp(-CLIP, CLIP)
+                if args.pmean_targets:  # zero (and zero weight) for t < W
+                    cs = torch.cat([torch.zeros_like(Y[:, :1]), Y.clamp(-CLIP, CLIP).cumsum(1)], 1)
+                    YL = torch.cat([YL] + [torch.cat([torch.zeros_like(Y[:, :w]), (cs[:, w:-1] - cs[:, :-w - 1]) / w], 1)
+                                           for w in args.pmean_targets], -1)
             hidden = None
             for c in range(0, X.shape[1], args.chunk):
                 pred, hidden, top = model(X[:, c:c + args.chunk], hidden, return_top=True)
