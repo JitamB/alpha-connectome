@@ -206,6 +206,9 @@ def main():
                     help='extra MSE on the predicted sum t0 + t1 (the cost-like part; clipped targets; 0 = off)')
     ap.add_argument('--valid-groups', choices=list(VALID_SPLITS), default='none',
                     help='also train on valid.parquet sequences (A = row groups < 937, B = the rest)')
+    ap.add_argument('--classes', type=int, nargs='+',
+                    help='train and monitor only on these asset classes (splits/train_classes.json), e.g. 3')
+    ap.add_argument('--init', help="fine-tune: start from another run's last.pt or best.pt (model incl. normalisation)")
     args = ap.parse_args()
     if args.gpu_features is None:
         args.gpu_features = args.device.startswith('cuda') and args.features == 'eng'
@@ -223,7 +226,13 @@ def main():
     if args.max_train_seqs:
         groups = sorted(rng.choice(groups, args.max_train_seqs, replace=False).tolist())
     groups += [VALID_OFFSET + g for g in VALID_SPLITS[args.valid_groups]]
-    monitor = holdout_groups()[:args.monitor_seqs]
+    monitor = holdout_groups()
+    if args.classes:
+        cls = json.loads((Path(__file__).resolve().parents[1] / 'splits' / 'train_classes.json').read_text())
+        assert args.valid_groups == 'none', 'class filter covers train groups only'
+        groups = [g for g in groups if cls[g] in args.classes]
+        monitor = [g for g in monitor if cls[g] in args.classes]
+    monitor = monitor[:args.monitor_seqs]
 
     n_in, transform = TRANSFORMS[args.features]
     atoms = torch.tensor(make_atoms())
@@ -242,6 +251,13 @@ def main():
     aux_std = None
     lag_head = nn.Linear(args.hidden, 2 * len(args.lag_targets)).to(device) if args.lag_weight and args.lag_targets else None
     mw = {k: v.to(device) for k, v in torch.load(args.mask_model).items()} if args.mask_model else None
+    if args.init:  # last.pt restores the training heads too; a plain best.pt leaves them freshly initialised
+        ck = torch.load(args.init, map_location=device, weights_only=False)
+        model.load_state_dict(ck.get('model', ck))
+        if aux_head is not None and ck.get('aux_head') is not None:
+            aux_head.load_state_dict(ck['aux_head']); aux_std = ck['aux_std']
+        if lag_head is not None and ck.get('lag_head') is not None:
+            lag_head.load_state_dict(ck['lag_head'])
     params = [p for m in (model, aux_head, lag_head) if m is not None for p in m.parameters()]
     opt = torch.optim.AdamW(params, lr=args.lr, weight_decay=1e-4)
     n_batches = (len(groups) + args.batch - 1) // args.batch

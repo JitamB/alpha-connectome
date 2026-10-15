@@ -187,4 +187,14 @@ KAGGLE_API_TOKEN from `kaggle auth print-access-token`.
 | gru_all_full_seed1 | gru_all_full recipe, seed 1 | 0.6815 | 0.5081 | 0.4483 | vs seed 0: +0.0005 / -0.0003 / +0.0017 (consistent) |
 | x_all_sum_s4000 | + MSE on predicted t0+t1 (weight 0.5) | 0.6775 | 0.4986 | 0.4386 | vs x_all_s4000: **-0.0014 / -0.0049 / -0.0024**, class 3 0.4229 vs 0.4254 -> drop |
 Packaged submissions/ens2_all_full (gru_all_full + seed1, numba, 42.6 us/row -> ~43 min projected, all checks pass).
-Its local V1 is being scored on Kaggle (job wunder-eval-ens2).
+Local score (Kaggle job wunder-eval-ens2): **V1 0.6829 / V2 0.5114 / V3 0.4506** (+0.0019 V1 over gru_all_full).
+**LB 0.6543** (44m52s, 710 MB): +0.0021 over 0.6522; gap V1 - LB 0.0286 (same as before).
+Per-class V1 of ens2: c0 0.798, c1 0.765, c2 0.726, **c3 0.430**.
+
+### 2026-10-15: class-3 specialist (Kaggle job wunder-c3ft, 2x T4) -- running
+Fine-tune each full model on class-3 train sequences only (4.2k seqs, 2 epochs, lr 3e-4, same recipe; monitor on
+class-3 holdout seqs), then route class-3 sequences to the specialist (class known from the warm-up rows).
+c3ft_s0 from gru_all_full/last.pt (heads restored), c3ft_s1 from gru_all_full_seed1/best.pt (training heads fresh),
+plus eval of their average. Scored with tools/route_moments.py (true class labels) vs ens2_all_full.
+Prior is modest: h384 (8x capacity) left class 3 unchanged, so a gain would have to come from removing
+interference between classes, not from capacity.
