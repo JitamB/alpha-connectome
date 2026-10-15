@@ -1,0 +1,2 @@
+runs/gru_eng_p64_full/best.pt
+runs/gru_eng_p64_full_e5/best.pt

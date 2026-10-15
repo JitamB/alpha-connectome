@@ -1,0 +1,18 @@
+{
+  "out": "runs/gru_eng_p64_full_e5",
+  "hidden": 128,
+  "layers": 2,
+  "features": "eng",
+  "skip": true,
+  "proj": 64,
+  "batch": 16,
+  "chunk": 1000,
+  "lr": 0.001,
+  "epochs": 5,
+  "max_train_seqs": null,
+  "monitor_seqs": 200,
+  "device": "cuda",
+  "seed": 0,
+  "gpu_features": true,
+  "n_train": 9807
+}

@@ -1,0 +1,11 @@
+# Data and environment (large, re-downloadable)
+wnn_connectome_starterpack/
+.venv/
+__pycache__/
+.DS_Store
+*.log
+
+# Rebuildable / bulky training artefacts: keep best.pt, config.json, history.json per run
+runs/**/last.pt
+runs/**/ema.pt
+submissions/*.zip

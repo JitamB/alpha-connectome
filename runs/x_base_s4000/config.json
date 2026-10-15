@@ -1,0 +1,19 @@
+{
+  "out": "runs/x_base_s4000",
+  "hidden": 128,
+  "layers": 2,
+  "features": "eng",
+  "skip": true,
+  "proj": 64,
+  "batch": 16,
+  "chunk": 1000,
+  "lr": 0.001,
+  "loss": "wmse",
+  "epochs": 3,
+  "max_train_seqs": 4000,
+  "monitor_seqs": 200,
+  "device": "cuda",
+  "seed": 0,
+  "gpu_features": true,
+  "n_train": 4000
+}
