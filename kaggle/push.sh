@@ -1,5 +1,5 @@
 #!/bin/bash
-# Usage: kaggle/push.sh JOB_SLUG 'RUN1|args...' ['RUN2|args...']
+# Usage: [EXTRA='files'] kaggle/push.sh JOB_SLUG 'RUN1|args...' ['RUN2|args...']   (RUN 'eval:NAME' = eval_torch args only)
 # Uploads the current code as private dataset jitamb/wunder-code (new version) and pushes a private GPU notebook
 # jitamb/<JOB_SLUG> running kaggle/run_job.py with the given runs (one per GPU).
 set -euo pipefail
@@ -11,7 +11,7 @@ B=$(mktemp -d)
 mkdir -p $B/data $B/kernel
 tar czf $B/data/code.tgz src/data.py src/evaluate.py src/features.py train/train_gru.py train/gpu_features.py \
     train/eval_torch.py tools/fetch_data.py splits/holdout.json wnn_connectome_starterpack/utils.py \
-    models/mask_model.py models/mask_mlp.pt
+    models/mask_model.py models/mask_mlp.pt ${EXTRA:-}   # EXTRA: more files, e.g. checkpoints for eval-only jobs
 cat > $B/data/dataset-metadata.json <<META
 {"title": "wunder-code", "id": "$USER/wunder-code", "licenses": [{"name": "other"}]}
 META

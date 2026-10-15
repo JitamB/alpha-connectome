@@ -1,0 +1,2 @@
+runs/gru_all_full/best.pt
+runs/gru_all_full_seed1/best.pt

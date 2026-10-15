@@ -171,7 +171,7 @@ Monitor (holdout[:200]) 0.4405, highest so far. Full-data run gru_all_full (same
 | gru_all_full (regression output) | **0.6810** | **0.5085** | **0.4466** | **+0.0096 (z 14) / +0.0068 (z 11)**; V2 +0.0083 / +0.0042; V3 +0.0061 / +0.0014 |
 | gru_all_full_dist / _blend | 0.6774 / 0.6812 | 0.4999 / 0.5071 | 0.4397 / 0.4460 | regression output kept |
 Packaged as submissions/gru_all_full (single model, numba, 24.3 us/row -> ~25 min projected; matches torch to 2e-6).
-Expected LB ~0.652-0.655 (current LB best 0.6459).
+**LB 0.6522** (24m46s, 707 MB): +0.0063 over 0.6459, 93% of the local gain.
 
 ### 2026-10-15: capacity with the new recipe (Kaggle job x-all-h384-s4000, 1x T4, ~116k rows/s, ~50 min)
 | name | change vs x_all_s4000 | V1 | V2 | V3 | paired delta (V1 / V2 / V3) |
@@ -180,3 +180,11 @@ Expected LB ~0.652-0.655 (current LB best 0.6459).
 Capacity is ruled out for good (h192 and h384, old and new recipe). No teacher/distillation.
 Kaggle note: the CLI's stored OAuth login stops working for API calls; kaggle/push.sh now exports a fresh
 KAGGLE_API_TOKEN from `kaggle auth print-access-token`.
+
+### 2026-10-15: Kaggle job wunder-seed1-sum (2x T4)
+| name | change | V1 | V2 | V3 | paired delta |
+|---|---|---|---|---|---|
+| gru_all_full_seed1 | gru_all_full recipe, seed 1 | 0.6815 | 0.5081 | 0.4483 | vs seed 0: +0.0005 / -0.0003 / +0.0017 (consistent) |
+| x_all_sum_s4000 | + MSE on predicted t0+t1 (weight 0.5) | 0.6775 | 0.4986 | 0.4386 | vs x_all_s4000: **-0.0014 / -0.0049 / -0.0024**, class 3 0.4229 vs 0.4254 -> drop |
+Packaged submissions/ens2_all_full (gru_all_full + seed1, numba, 42.6 us/row -> ~43 min projected, all checks pass).
+Its local V1 is being scored on Kaggle (job wunder-eval-ens2).

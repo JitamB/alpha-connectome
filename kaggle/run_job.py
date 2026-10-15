@@ -31,10 +31,15 @@ sh('pip install -q onnx onnxruntime')
 sh('python -u tools/fetch_data.py wnn_connectome_starterpack datasets/train.parquet datasets/valid.parquet')
 procs = []
 for gpu, (run, args) in enumerate(JOBS):
-    train = shlex.join(['python', '-u', 'train/train_gru.py', '--out', f'runs/{run}', '--device', 'cuda', *args])
-    evaluate = shlex.join(['python', '-u', 'train/eval_torch.py', f'runs/{run}', '--name', run, '--batch', '32'])
+    if run.startswith('eval:'):  # evaluation only: args are eval_torch arguments (runs shipped via EXTRA)
+        run = run[5:]
+        cmd = shlex.join(['python', '-u', 'train/eval_torch.py', *args, '--name', run, '--batch', '32'])
+    else:
+        train = shlex.join(['python', '-u', 'train/train_gru.py', '--out', f'runs/{run}', '--device', 'cuda', *args])
+        evaluate = shlex.join(['python', '-u', 'train/eval_torch.py', f'runs/{run}', '--name', run, '--batch', '32'])
+        cmd = f'{train} && {evaluate}'
     log = open(f'{OUT}/{run}.log', 'w')
-    procs.append((run, subprocess.Popen(f'{train} && {evaluate}', shell=True, stdout=log, stderr=subprocess.STDOUT,
+    procs.append((run, subprocess.Popen(cmd, shell=True, stdout=log, stderr=subprocess.STDOUT,
                                         env={**os.environ, 'CUDA_VISIBLE_DEVICES': str(gpu)})))
 for run, p in procs:
     print(run, 'exit', p.wait(), flush=True)
