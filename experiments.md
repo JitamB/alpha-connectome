@@ -295,3 +295,13 @@ noise, so single-run z-scores overstate significance; the seed-0 future-target "
 negative deltas above are mostly regression from it. All aux variants are within noise of the base recipe ->
 **aux-target tuning is saturated**. Decision rule from here: a change must beat the multi-seed mean by >= 2x the run
 spread (~+0.0012 V1) in two seeds.
+
+### 2026-10-16: LSTM and pair diversity (job wunder-lstm-div)
+| name | V1 | V2 | V3 | note |
+|---|---|---|---|---|
+| gru_all_lstm (LSTM cells, same recipe, seed 0) | 0.6810 | 0.5069 | 0.4454 | vs gru_all_full +0.0000 / -0.0015 / -0.0012 |
+| pair_s0_lstm (gru_all_full + LSTM) | 0.6828 | 0.5110 | 0.4494 | vs ens2_all_full (seed pair): -0.0001 / -0.0004 / -0.0012 |
+| pair_s0_fut (gru_all_full + future-target GRU) | 0.6832 | 0.5112 | 0.4497 | vs ens2_all_full: +0.0003 / -0.0002 / -0.0009 |
+Pair gain over the mean of its two singles: seed pair +0.0017, GRU+LSTM +0.0018, GRU+fut-GRU +0.0015 -> **a different
+cell type or aux recipe averages exactly like another seed.** The diversity premise fails: no LSTM kernel work.
+(pair_s0_s2 / pair_s0_cnn hit CUDA OOM running concurrently on one GPU; not needed for the decision.)
