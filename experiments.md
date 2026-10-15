@@ -281,3 +281,17 @@ the raw inputs find nothing the engineered features miss (matches D2). Dropped; 
 
 ### Next: job wunder-aux2 (both paired with gru_all_fut_full, seed 0)
 gru_all_fut_mid_full (lags 30 60 100 300 + future 100 300) and gru_all_fut_pmean_full (+ past-mean targets over 100 / 1000).
+
+### 2026-10-16: aux-target round (jobs wunder-aux1, wunder-aux2; full data)
+| name | change | V1 | V2 | V3 | paired delta vs reference (V1 / V2 / V3) |
+|---|---|---|---|---|---|
+| gru_all_fut_full_seed1 | future targets, seed 1 (replicate) | 0.6817 | 0.5082 | 0.4484 | vs gru_all_full_seed1: +0.0002 / +0.0001 / +0.0001 -> **the seed-0 +0.0014 did not replicate** |
+| gru_all_fut_lw1_full | lag/future weight 1.0 | 0.6808 | 0.5080 | 0.4478 | vs gru_all_fut_full: -0.0016 / -0.0006 / +0.0004 |
+| gru_all_fut_mid_full | + lags 30, 60 | 0.6812 | 0.5085 | 0.4496 | -0.0012 / -0.0001 / +0.0022 |
+| gru_all_fut_pmean_full | + past-target means over 100 / 1000 | 0.6808 | 0.5077 | 0.4493 | -0.0016 / -0.0009 / +0.0019 |
+**Run-to-run spread**: the 9 full-data runs of this recipe family (3 seeds, 5 aux variants, CNN) span V1 0.6804-0.6824,
+sd 0.0006 (V2 0.0008, V3 0.0012). The paired bootstrap sigma (~0.0004) only covers sequence sampling, not training
+noise, so single-run z-scores overstate significance; the seed-0 future-target "gain" was a high draw and the
+negative deltas above are mostly regression from it. All aux variants are within noise of the base recipe ->
+**aux-target tuning is saturated**. Decision rule from here: a change must beat the multi-seed mean by >= 2x the run
+spread (~+0.0012 V1) in two seeds.
