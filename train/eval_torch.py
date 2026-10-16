@@ -20,13 +20,35 @@ from gpu_features import torch_features  # noqa: E402
 from train_gru import TRANSFORMS, GRUModel, decode_dist, make_atoms  # noqa: E402
 
 
-def load(run: Path, weights: str, device):
+def quantize(w, mode):
+    """Round a weight matrix the way a reduced-precision kernel would store it (computation stays fp32)."""
+    if mode == 'bf16':
+        return w.to(torch.bfloat16).float()
+    scale = w.abs().amax(1, keepdim=True).clamp_min(1e-12) / 127.0          # int8, symmetric, per output row
+    return (w / scale).round().clamp(-127, 127) * scale
+
+
+@torch.no_grad()
+def quantize_model(model, mode):
+    """Quantize every weight matrix; the projection and skip head are quantized after folding in the input
+    standardisation (as src/fast_gru.pack stores them), biases stay fp32."""
+    inv = 1.0 / model.std
+    for lin in [m for m in (model.proj, model.skip_head) if m is not None]:
+        lin.weight.copy_(quantize(lin.weight * inv, mode) / inv)
+    for name, p in model.named_parameters():
+        if p.dim() == 2 and not name.startswith(('proj.', 'skip_head.')):
+            p.copy_(quantize(p, mode))
+
+
+def load(run: Path, weights: str, device, quant='none'):
     cfg = json.loads((run / 'config.json').read_text())
     atoms = len(make_atoms()) if cfg.get('dist_weight') else 0
     conv = (cfg['conv'][0], cfg['conv'][1], cfg['conv'][2:]) if cfg.get('conv') else None
     model = GRUModel(TRANSFORMS[cfg['features']][0], cfg['hidden'], cfg['layers'], cfg['skip'], cfg.get('proj', 0), atoms, conv,
                      cfg.get('cell', 'gru'))
     model.load_state_dict(torch.load(run / weights, map_location=device))
+    if quant != 'none':
+        quantize_model(model, quant)
     return model.to(device).eval(), cfg['features'] == 'eng'
 
 
@@ -37,11 +59,13 @@ if __name__ == '__main__':
     ap.add_argument('--weights', default='best.pt')
     ap.add_argument('--batch', type=int, default=16)
     ap.add_argument('--max-seqs', type=int, help='quick check on the first N sequences of each view')
+    ap.add_argument('--quant', choices=['none', 'bf16', 'int8'], default='none',
+                    help='simulate reduced-precision weight storage (fp32 compute)')
     ap.add_argument('--output', choices=['reg', 'dist', 'blend'], default='reg',
                     help='regression head, decoded distributional head, or their average')
     args = ap.parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    models = [load(r, args.weights, device) for r in args.runs]
+    models = [load(r, args.weights, device, args.quant) for r in args.runs]
     atoms = torch.tensor(make_atoms(), device=device)
 
     def output(m, x):
