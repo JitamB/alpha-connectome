@@ -372,3 +372,12 @@ Four trainings on 2 GPUs (two per T4) -> ft1 and gru_all_tvA_tm hit CUDA OOM; on
 | ft3 | same, seed 13 | 0.6806 | 0.5079 | 0.4471 |
 (base gru_all_full 0.6810 / 0.5085 / 0.4466: single fine-tunes are within noise, as expected.)
 Relaunched: wunder-soup2 (ft1, gru_all_tvA_tm, soup_ft3, ens_ft3) and wunder-soup23 (soup / ensemble of ft2 + ft3).
+
+### 2026-10-16: 2-way soup (job wunder-soup23)
+| name | V1 | V2 | V3 | vs gru_all_full (V1 / V2 / V3) |
+|---|---|---|---|---|
+| soup_ft23 (weights of ft2 + ft3 averaged; 1 model) | 0.6814 | 0.5091 | 0.4481 | +0.0004 / +0.0006 / +0.0015 |
+| ens_ft23 (predictions of ft2 + ft3 averaged; 2 models) | 0.6815 | 0.5093 | 0.4483 | +0.0005 / +0.0009 / +0.0017 |
+**The soup works** (soup - ensemble: -0.0001 V1, the fine-tunes stay linearly connected), but 1-epoch lr-3e-4
+fine-tunes are too similar: their ensemble adds only +0.0005 (a seed pair adds +0.0017). Next: lr 1e-3 fine-tunes
+(job wunder-souphi) for more diversity, checking that the soup still tracks the ensemble.
