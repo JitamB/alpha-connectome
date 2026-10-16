@@ -30,13 +30,12 @@ def quantize(w, mode):
 
 @torch.no_grad()
 def quantize_model(model, mode):
-    """Quantize every weight matrix; the projection and skip head are quantized after folding in the input
-    standardisation (as src/fast_gru.pack stores them), biases stay fp32."""
+    """Quantize the matrices src/fast_gru.pack(bf16=True) stores in reduced precision: the projection (after folding
+    in the input standardisation) and the GRU input / hidden weights. Heads and biases stay fp32."""
     inv = 1.0 / model.std
-    for lin in [m for m in (model.proj, model.skip_head) if m is not None]:
-        lin.weight.copy_(quantize(lin.weight * inv, mode) / inv)
+    model.proj.weight.copy_(quantize(model.proj.weight * inv, mode) / inv)
     for name, p in model.named_parameters():
-        if p.dim() == 2 and not name.startswith(('proj.', 'skip_head.')):
+        if name.startswith('blocks.') and p.dim() == 2:
             p.copy_(quantize(p, mode))
 
 

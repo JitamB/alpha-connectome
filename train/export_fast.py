@@ -25,6 +25,7 @@ if __name__ == '__main__':
     ap.add_argument('runs', nargs='+', type=Path)
     ap.add_argument('--name', required=True)
     ap.add_argument('--weights', default='best.pt')
+    ap.add_argument('--bf16', action='store_true', help='store the large matrices as bfloat16 (half the weight bytes)')
     ap.add_argument('--alpha', type=float, default=0.0, help='share of the decoded distributional head in the output')
     args = ap.parse_args()
     sds = []
@@ -36,7 +37,7 @@ if __name__ == '__main__':
         sds.append({k: v.numpy() for k, v in torch.load(run / args.weights, map_location='cpu').items()})
     out = ROOT / 'submissions' / args.name
     out.mkdir(parents=True, exist_ok=True)
-    np.savez(out / 'weights.npz', **pack(sds, make_atoms(), args.alpha))
+    np.savez(out / 'weights.npz', **pack(sds, make_atoms(), args.alpha, args.bf16))
     shutil.copy(ROOT / 'src' / 'fast_gru.py', out / 'fast_gru.py')
     shutil.copy(ROOT / 'templates' / 'solution_fast.py', out / 'solution.py')
     (out / 'MODELS.txt').write_text('\n'.join(f'{r}/{args.weights}' for r in args.runs) + '\n')

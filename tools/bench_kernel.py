@@ -31,6 +31,14 @@ if __name__ == '__main__':
     W = dict(np.load(args.submission / 'weights.npz'))
     X = np.ascontiguousarray(next(iter(iter_sequences(VALID, [0]))).X, dtype=np.float32)
     out = {}
+    try:  # CPU model and the vector extensions that matter for the kernel
+        info = Path('/proc/cpuinfo').read_text().split('\n\n')[0]
+        model = next(l.split(':', 1)[1].strip() for l in info.splitlines() if l.startswith('model name'))
+        flags = next(l.split(':', 1)[1].split() for l in info.splitlines() if l.startswith('flags'))
+        out['cpu'] = {'model': model, 'flags': sorted(f for f in flags if f.startswith(('avx', 'fma', 'amx')))}
+        print(out['cpu'], flush=True)
+    except (OSError, StopIteration):
+        pass
     for K in range(1, W['Whh0'].shape[0] + 1):
         w = {k: (v if k in ('atoms', 'alpha') else np.ascontiguousarray(v[:K])) for k, v in W.items()}
         m = FastEnsemble(w)
