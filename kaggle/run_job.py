@@ -30,17 +30,18 @@ os.chdir(WORK)
 sh('pip install -q onnx onnxruntime')
 sh('python -u tools/fetch_data.py wnn_connectome_starterpack datasets/train.parquet datasets/valid.parquet')
 procs = []
-# Training and 'py:' runs go in parallel, one per GPU; 'eval:' runs (eval_torch arguments, e.g. averages of runs trained above
+# Training and 'py:' runs go in parallel, one per GPU; 'eval:' and 'post:' runs (eval_torch arguments, e.g. averages of runs trained above
 # or shipped via EXTRA) go afterwards, in parallel over the GPUs.
-for stage in ([j for j in JOBS if not j[0].startswith('eval:')], [j for j in JOBS if j[0].startswith('eval:')]):
+late = ('eval:', 'post:')  # run after every training / py: run has finished
+for stage in ([j for j in JOBS if not j[0].startswith(late)], [j for j in JOBS if j[0].startswith(late)]):
     for p in [p for _, p in procs]:
         p.wait()
     for gpu, (run, args) in enumerate(stage):
         if run.startswith('eval:'):
             run = run[5:]
             cmd = shlex.join(['python', '-u', 'train/eval_torch.py', *args, '--name', run, '--batch', '32'])
-        elif run.startswith('py:'):  # any repo script: args = script path + its arguments (writes results/<run>*)
-            run = run[3:]
+        elif run.startswith(('py:', 'post:')):  # any repo script: args = script path + its arguments (writes results/<run>*)
+            run = run.split(':', 1)[1]
             cmd = shlex.join(['python', '-u', *args])
         else:
             train = shlex.join(['python', '-u', 'train/train_gru.py', '--out', f'runs/{run}', '--device', 'cuda', *args])

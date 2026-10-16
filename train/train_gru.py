@@ -169,14 +169,17 @@ def read_batch(path, groups):
 
 
 def prefetch(groups_batches, transform=None, path=TRAIN, depth=1):
-    """Background thread that reads batches of sequences -> (X (B,T,F), Y (B,T,2)) numpy arrays."""
+    """Background thread that reads batches of sequences -> (X (B,T,F), Y (B,T,2), M (B,T)) numpy arrays;
+    M = official is_scored mask (0/1) for valid sequences, -1 for train sequences (no mask)."""
     q = queue.Queue(depth)
 
     def work():
         for groups in groups_batches:
             seqs = read_batch(path, groups)
             X = np.stack([s.X if transform is None else transform(s.X) for s in seqs])
-            q.put((X, np.stack([s.y for s in seqs])))
+            M = np.stack([s.scored.astype(np.float32) if s.scored is not None else np.full(len(s.y), -1, np.float32)
+                          for s in seqs])
+            q.put((X, np.stack([s.y for s in seqs]), M))
         q.put(None)
 
     threading.Thread(target=work, daemon=True).start()
@@ -190,7 +193,7 @@ def monitor_score(model, groups, device, transform, gpu_features=False, batch=16
     model.eval()
     moments = []
     batches = [groups[i:i + batch] for i in range(0, len(groups), batch)]
-    for X, Y in prefetch(batches, None if gpu_features else transform):
+    for X, Y, _ in prefetch(batches, None if gpu_features else transform):
         X = torch.from_numpy(X).to(device)
         pred, _ = model(torch_features(X) if gpu_features else X, None)
         pred = pred.float().cpu().numpy()
@@ -231,6 +234,8 @@ def main():
                     help='extra lag-head outputs: mean of the clipped targets over [t-W, t) for each W')
     ap.add_argument('--mask-model', help='models/mask_mlp.pt: weight rows by eps + p(is_scored) (wmse, eng only)')
     ap.add_argument('--mask-eps', type=float, default=0.1)
+    ap.add_argument('--valid-true-mask', action='store_true',
+                    help='with --mask-model and --valid-groups: weight valid rows by eps + the official is_scored mask')
     ap.add_argument('--dist-weight', type=float, default=0.0,
                     help='weight of a cross-entropy loss for a distributional head over the target atoms (0 = off)')
     ap.add_argument('--sum-weight', type=float, default=0.0,
@@ -321,7 +326,7 @@ def main():
         order = np.random.default_rng(args.seed + epoch).permutation(groups)
         batches = [sorted(order[i:i + args.batch].tolist()) for i in range(0, len(order), args.batch)]
         t0, losses, aux_losses, lag_losses, dist_losses = time.time(), [], [], [], []
-        for b, (X, Y) in enumerate(prefetch(batches, None if args.gpu_features else transform)):
+        for b, (X, Y, M) in enumerate(prefetch(batches, None if args.gpu_features else transform)):
             X, Y = torch.from_numpy(X).to(device), torch.from_numpy(Y).to(device)
             if aux_head is not None:
                 A, V = aux_targets(X[..., :112], args.aux_horizons)  # raw block comes first in both layouts
@@ -333,6 +338,9 @@ def main():
             if mw is not None:
                 with torch.no_grad():
                     R = args.mask_eps + mask_prob(X, mw)
+                    if args.valid_true_mask:  # valid sequences: the official mask instead of the proxy
+                        M = torch.from_numpy(M).to(device)
+                        R = torch.where(M >= 0, args.mask_eps + M, R)
             if lag_head is not None:  # (B, T, 2 * n_lags) clipped y[t-H] (H < 0: future y[t+|H|]), zero (and zero weight) off the ends
                 YL = torch.cat([torch.cat([torch.zeros_like(Y[:, :h]), Y[:, :-h]], 1) if h > 0 else
                                 torch.cat([Y[:, -h:], torch.zeros_like(Y[:, :-h])], 1) for h in args.lag_targets], -1).clamp(-CLIP, CLIP)
