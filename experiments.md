@@ -343,3 +343,9 @@ Per-class |y|-weighted ridge stacked on the ens2_all_full (train-only) predictio
 V2 likewise <= +0.0002. HistGB on everything (G1): V1 0.6792 vs 0.6829 pred. **Gate failed** (needed +0.002): decoded
 i0 paths, i1 lead-lag and event-clock features add nothing on top of the GRU ensemble. Decoded-path / event-clock GRU
 (#3) not built. Search closed; remaining time goes to final selection.
+
+### 2026-10-16: LB attempt of ens3_all_tv
+**SCORE: TIMEOUT** at 61m56s (projected ~55 min from 53.7 us/row x 1.55). Real/projected >= 1.13 for 3 models vs 0.99-1.04
+for 2 models -> the scorer slowdown grows with the number of models (weights 3 x ~0.86 MB spill out of cache), so the
+1.55 factor is only valid up to 2 models. The 48-min check threshold in check_submission was right; keep it.
+Final picks: ens2_all_tv (LB 0.6562, 43m36s) primary; ens2_all_full (LB 0.6543) backup.
