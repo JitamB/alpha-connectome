@@ -325,3 +325,21 @@ measure the current recipe's 3rd-model gain (old recipe: +0.0009 V1).
 Packaged submissions/ens3_all_tv (3 train+valid models): all correctness checks pass; 53.7 us/row -> **~55 min projected**
 (fails only our own 48-min safety threshold; real/projected has been 0.99-1.04 -> 54-57 min of the 60-min limit).
 Expected LB ~ 0.6562 + 0.0004.
+
+### 2026-10-16: external EDA review + decoded-path gate (job wunder-gate-paths, tools/gate_paths.py)
+Verified on 48 valid seqs (12 per class): targets change only on i0 price-shape transitions (100%; 52-65% of
+transitions change a target); shapes per seq cls3 8 / cls2 27 / cls1 295 / cls0 1034; dp1-3 and dv1-3 are functions of
+dp0 / dv0; a6 ~ time since the last i0 transition (Spearman 0.75-0.92); cls3 transition rows scored 2.8% vs 13.8% (no
+effect in other classes) -- and the mask MLP already predicts it (0.059 vs 0.183). Transition -> tick table accuracy
+(fit / test halves): cls3 98.5%, cls2 82%, cls1 81%, cls0 85% (coverage 89-100%).
+Gate: tables from 3000 train seqs (i0 decode 396k types, i1 encodings 649k; coverage valid 98% / 91%), causal window
+sums (10/100/1000) of decoded i0 moves, i0 and i1 lead-lag target encodings (H 100), timers and transition counts.
+Per-class |y|-weighted ridge stacked on the ens2_all_full (train-only) predictions, vs ridge on the predictions alone:
+| setting | +i0 | +i1 | +clock | +all | cls3 (+all) |
+|---|---|---|---|---|---|
+| G1 holdout -> valid, V1 | -0.0006 | +0.0001 | -0.0008 | -0.0010 | -0.0014 |
+| G2 half A -> B, V1 | +0.0002 | +0.0002 | -0.0007 | -0.0008 | -0.0034 |
+| G2 half B -> A, V1 | +0.0000 | +0.0005 | -0.0009 | -0.0010 | -0.0052 |
+V2 likewise <= +0.0002. HistGB on everything (G1): V1 0.6792 vs 0.6829 pred. **Gate failed** (needed +0.002): decoded
+i0 paths, i1 lead-lag and event-clock features add nothing on top of the GRU ensemble. Decoded-path / event-clock GRU
+(#3) not built. Search closed; remaining time goes to final selection.
