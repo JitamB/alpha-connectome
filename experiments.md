@@ -363,3 +363,12 @@ The claimed ~0.655 does not reproduce on our V1 (0.634 = our old linear model; L
 ens2_all_full only loses (w 0.05: -0.0001, 0.1: -0.0005, 0.2: -0.0019); w chosen on half A = 0. Dropped.
 Kernel bench on the Kaggle CPU (bench_kaggle_cpu): K=1 44.6, K=2 99.5, K=3 146.0 us/row -> superlinear already at K=2
 there, unlike the scorer (fine at K=2, timeout at K=3) -> not a usable proxy for scorer runtime.
+
+### 2026-10-16: model soup, attempt 1 (job wunder-soup-tm)
+Four trainings on 2 GPUs (two per T4) -> ft1 and gru_all_tvA_tm hit CUDA OOM; one training per GPU from now on.
+| name | change | V1 | V2 | V3 |
+|---|---|---|---|---|
+| ft2 | gru_all_full/last.pt fine-tuned 1 epoch, lr 3e-4, seed 12 | 0.6815 | 0.5092 | 0.4477 |
+| ft3 | same, seed 13 | 0.6806 | 0.5079 | 0.4471 |
+(base gru_all_full 0.6810 / 0.5085 / 0.4466: single fine-tunes are within noise, as expected.)
+Relaunched: wunder-soup2 (ft1, gru_all_tvA_tm, soup_ft3, ens_ft3) and wunder-soup23 (soup / ensemble of ft2 + ft3).
