@@ -349,3 +349,17 @@ i0 paths, i1 lead-lag and event-clock features add nothing on top of the GRU ens
 for 2 models -> the scorer slowdown grows with the number of models (weights 3 x ~0.86 MB spill out of cache), so the
 1.55 factor is only valid up to 2 models. The 48-min check threshold in check_submission was right; keep it.
 Final picks: ens2_all_tv (LB 0.6562, 43m36s) primary; ens2_all_full (LB 0.6543) backup.
+
+### 2026-10-16: Discord "frozen random filter bank" baseline (job wunder-reservoir, tools/reservoir.py)
+Recipe as posted: P = randn(112, C)/sqrt(112) (seed 0), causal EMA per channel, half-lives geomspace(1, 3000, C),
+|y|-weighted ridge on 2000 train seqs (every 2nd row), ridge strength picked on the holdout.
+| model | V1 | V2 | V3 |
+|---|---|---|---|
+| reservoir C=1024 | 0.6335 | 0.4586 | 0.3795 |
+| reservoir C=512 | 0.6283 | 0.4551 | 0.3759 |
+| (ref) our 672-feature ridge linear_all | 0.6352 | 0.4563 | 0.3801 |
+| (ref) ens2_all_full | 0.6829 | 0.5114 | 0.4506 |
+The claimed ~0.655 does not reproduce on our V1 (0.634 = our old linear model; LB-equivalent ~0.605). Blending it into
+ens2_all_full only loses (w 0.05: -0.0001, 0.1: -0.0005, 0.2: -0.0019); w chosen on half A = 0. Dropped.
+Kernel bench on the Kaggle CPU (bench_kaggle_cpu): K=1 44.6, K=2 99.5, K=3 146.0 us/row -> superlinear already at K=2
+there, unlike the scorer (fine at K=2, timeout at K=3) -> not a usable proxy for scorer runtime.
