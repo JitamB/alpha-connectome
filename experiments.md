@@ -381,3 +381,16 @@ Relaunched: wunder-soup2 (ft1, gru_all_tvA_tm, soup_ft3, ens_ft3) and wunder-sou
 **The soup works** (soup - ensemble: -0.0001 V1, the fine-tunes stay linearly connected), but 1-epoch lr-3e-4
 fine-tunes are too similar: their ensemble adds only +0.0005 (a seed pair adds +0.0017). Next: lr 1e-3 fine-tunes
 (job wunder-souphi) for more diversity, checking that the soup still tracks the ensemble.
+
+### 2026-10-16: soup and true-mask results (jobs wunder-soup2, wunder-souphi)
+| name | V1 | V2 | V3 | V1 vs gru_all_full |
+|---|---|---|---|---|
+| ft1 (lr 3e-4 fine-tune, seed 11) | 0.6810 | 0.5087 | 0.4470 | +0.0000 |
+| soup_ft3 (weights of ft1-3 averaged; 1 model) | 0.6814 | 0.5093 | 0.4482 | +0.0004 (z 1.9) |
+| ens_ft3 (predictions of ft1-3; 3 models) | 0.6816 | 0.5097 | 0.4484 | +0.0006 |
+| fthi1 / fthi2 (lr 1e-3 fine-tunes) | 0.6799 / 0.6795 | 0.5064 / 0.5063 | 0.4470 / 0.4461 | -0.0011 / -0.0015 |
+| soup_fthi / ens_fthi | 0.6803 / 0.6808 | 0.5074 / 0.5085 | 0.4483 / 0.4488 | -0.0007 / -0.0002 |
+Soup verdict: weight averaging matches prediction averaging at lr 3e-4, but fine-tunes from one checkpoint are too
+similar (+0.0004); at lr 1e-3 they drift and get worse. Ceiling ~+0.0004 per model, under the +0.0012 bar -> dropped.
+True mask on valid rows (gru_all_tvA_tm vs gru_all_tvA, both train + valid A, clean half B): V1 +0.0009 (sigma
+0.0013), V2 +0.0001, V3 -0.0008 -> noise; not adopted.
