@@ -394,3 +394,14 @@ Soup verdict: weight averaging matches prediction averaging at lr 3e-4, but fine
 similar (+0.0004); at lr 1e-3 they drift and get worse. Ceiling ~+0.0004 per model, under the +0.0012 bar -> dropped.
 True mask on valid rows (gru_all_tvA_tm vs gru_all_tvA, both train + valid A, clean half B): V1 +0.0009 (sigma
 0.0013), V2 +0.0001, V3 -0.0008 -> noise; not adopted.
+
+### 2026-10-16: bf16 weight storage (fast_gru pack/export --bf16)
+Five large matrices stored as bfloat16 bits (2-model weights 1.75 MB -> 0.89 MB), widened to fp32 in explicit numba
+loops; matches the torch bf16 simulation to 9e-5. Speed (us/row, K = 1 / 2 / 3):
+| machine | fp32 (BLAS sgemv) | bf16 (loops) |
+|---|---|---|
+| M2 (2 models) | 38.5 | 56.5 |
+| Kaggle Intel Xeon 2.0 GHz, AVX-512 F/BW/DQ/VL (no VNNI / BF16) | 62.1 / 115.7 / 167.5 | 67.9 / 127.4 / 189.5 |
+bf16 is 10-13% slower even on an AVX-512 x86 CPU: halving the weight bytes does not pay for the widening + loop
+overhead against BLAS, so memory bandwidth is not the limit there. Not uploaded; the numba speed-up route is closed.
+A C/int8-VNNI kernel would be the only remaining route (1-2 days, scorer CPU flags unverified, ~+0.0004) -> not pursued.
