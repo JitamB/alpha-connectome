@@ -405,3 +405,6 @@ loops; matches the torch bf16 simulation to 9e-5. Speed (us/row, K = 1 / 2 / 3):
 bf16 is 10-13% slower even on an AVX-512 x86 CPU: halving the weight bytes does not pay for the widening + loop
 overhead against BLAS, so memory bandwidth is not the limit there. Not uploaded; the numba speed-up route is closed.
 A C/int8-VNNI kernel would be the only remaining route (1-2 days, scorer CPU flags unverified, ~+0.0004) -> not pursued.
+Accuracy of reduced-precision weights (torch simulation, ens2_all_full; all matrices incl. heads rounded):
+bf16 V1 0.6829 / V2 0.5114 / V3 0.4506 = unchanged; int8 (per-row symmetric) V1 0.6822 / V2 0.5100 / V3 0.4488 =
+-0.0007 / -0.0014 / -0.0018. bf16 is free accuracy-wise; int8 costs more than a third model would add.
