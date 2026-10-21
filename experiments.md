@@ -439,3 +439,8 @@ gru_all_full seed 0).
 Fine-tuning on valid alone forgets the train distribution -> dropped. 3x valid weighting points the same way as the
 original valid-data gain (tvA vs full: V2 half B +0.0037); single seed, so a paired seed-1 replicate is running
 (job wunder-validw2: gru_all_tvA_seed1 vs gru_all_tvA_vr3_seed1).
+
+### 2026-10-21: wunder-distil invalid (bug)
+The distillation term was overwritten by the aux-loss line (`total = loss + aux`), so distil_w1_full / distil_w3_full
+trained bit-identically to gru_all_full (same monitor curve, zero paired delta) -- which also confirms full training
+determinism (same seed => identical model). Fixed (commit "Fix: distillation term..."); relaunched as job wunder-distil2.
