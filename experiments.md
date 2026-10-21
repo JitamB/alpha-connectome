@@ -408,3 +408,14 @@ A C/int8-VNNI kernel would be the only remaining route (1-2 days, scorer CPU fla
 Accuracy of reduced-precision weights (torch simulation, ens2_all_full; all matrices incl. heads rounded):
 bf16 V1 0.6829 / V2 0.5114 / V3 0.4506 = unchanged; int8 (per-row symmetric) V1 0.6822 / V2 0.5100 / V3 0.4488 =
 -0.0007 / -0.0014 / -0.0018. bf16 is free accuracy-wise; int8 costs more than a third model would add.
+
+## 2026-10-21: autonomous round 1 (new hypotheses; reference = gru_all_full seeds 0/1/2, V1 mean 0.6811, run sd 0.0006)
+**H1 privileged-teacher distillation.** A teacher GRU also sees the future (mean(x[t+1..t+h]) - x[t], h = 1..1000, all
+112 columns; `--future-inputs`), so its prediction is a much less noisy estimate of the target. The student (deployable,
+unchanged architecture) adds a |y|-weighted MSE to the clipped teacher prediction (`--teacher`, weight 1). If the teacher
+is calibrated, E[|y| teacher | past] = E[|y| y | past], so the student's optimum is unchanged while label noise drops
+-- equivalent to more data (s4000 -> full gave +0.0021 V1). Teachers are cross-fitted on train halves (group % 2) so
+no student sequence gets an in-sample teacher prediction. Zero inference cost. Job wunder-teach: teacher_h0/h1.
+**H2 valid emphasis.** Valid data transferred to LB at ~5x the per-sequence value of train data (likely closer to the
+test period/mix). gru_all_tvA_vr3 = train + valid A repeated 3x; gru_all_tvA_vft = gru_all_tvA fine-tuned on valid A
+only (2 epochs, lr 3e-4). Both judged against gru_all_tvA on clean valid half B. Job wunder-validw.
