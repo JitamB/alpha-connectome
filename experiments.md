@@ -494,3 +494,9 @@ the plain valid refit's LB gain (+0.0019) suggests it is at least partly.
 Packaged **submissions/ens2_all_tv_vr3** (same architecture/shape as ens2_all_tv -> same scorer runtime, ~44 min);
 checks running on a Kaggle CPU (job wunder-check-vr3: check_submission + tools/verify_numba.py vs torch).
 Expected LB if valid-like: ens2_all_tv 0.6562 + ~0.0013 (90% of +0.0015).
+Checks (Kaggle CPU, job wunder-check-vr3 v2): ZIP 1.56 MB, imports, output contract, determinism, no state leakage,
+causality all PASS; numba vs torch max |diff| 1.7e-6 over 4 valid seqs (tools/verify_numba.py). The runtime projection
+there (151 us/row) is not meaningful (Kaggle CPU is not a scorer proxy, see bench_kaggle_cpu); the package has exactly
+the shapes of ens2_all_tv (43m36s on the scorer) with the newer allocation-free kernel -> expected ~43-44 min.
+First attempt failed only because macOS tar shipped ._ AppleDouble files (push.sh now sets COPYFILE_DISABLE=1).
+**Upload candidate: submissions/ens2_all_tv_vr3.zip.**
