@@ -444,3 +444,24 @@ original valid-data gain (tvA vs full: V2 half B +0.0037); single seed, so a pai
 The distillation term was overwritten by the aux-loss line (`total = loss + aux`), so distil_w1_full / distil_w3_full
 trained bit-identically to gru_all_full (same monitor curve, zero paired delta) -- which also confirms full training
 determinism (same seed => identical model). Fixed (commit "Fix: distillation term..."); relaunched as job wunder-distil2.
+
+### 2026-10-21: distillation from privileged teachers (job wunder-distil2, fixed), paired vs gru_all_full (seed 0)
+| name | V1 | V2 | V3 | paired delta (V1 / V2 / V3) |
+|---|---|---|---|---|
+| distil_w1_full | 0.6814 | 0.5094 | 0.4476 | +0.0004 (z 0.8) / +0.0010 (z 2.0) / +0.0011 (z 1.2) |
+| distil_w3_full | 0.6810 | 0.5088 | 0.4475 | +0.0000 / +0.0003 / +0.0009 |
+Training is deterministic, so these deltas are the pure effect of distillation, yet they are within the run spread
+(sd 0.0006 V1). A teacher at holdout WP 0.85 (vs 0.44) does not make the student better: the student is not limited by
+label noise (consistent with D1: no overfitting; more data helps little). **H1 rejected** -- cleaner targets do not
+break the plateau; not pursued further (w1 at most +0.0004 V1).
+
+### 2026-10-21: valid emphasis replicate (job wunder-validw2), clean valid half B
+| pair (seed 1) | V1 half B | V2 half B | V3 |
+|---|---|---|---|
+| gru_all_tvA_vr3_seed1 vs gru_all_tvA_seed1 | **+0.0015 (z 2.3)** | **+0.0026 (z 3.5)** | +0.0005 |
+| (seed 0, earlier) gru_all_tvA_vr3 vs gru_all_tvA | +0.0016 (z 0.8) | +0.0031 (z 2.3) | -0.0005 |
+| (seed noise) gru_all_tvA_seed1 vs gru_all_tvA | +0.0003 | -0.0003 | +0.0011 |
+**H2 confirmed in two seeds:** repeating the valid sequences 3x adds ~+0.0015 V1 / +0.0028 V2 on unseen valid
+sequences without hurting the train holdout. Valid-like data is worth more than train data for valid-like (and, by the
+LB transfer of the plain valid gain, test-like) sequences. Next: final models train + all valid x3 (2 seeds), and
+whether more emphasis (x6) helps further.
