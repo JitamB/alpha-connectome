@@ -500,3 +500,8 @@ there (151 us/row) is not meaningful (Kaggle CPU is not a scorer proxy, see benc
 the shapes of ens2_all_tv (43m36s on the scorer) with the newer allocation-free kernel -> expected ~43-44 min.
 First attempt failed only because macOS tar shipped ._ AppleDouble files (push.sh now sets COPYFILE_DISABLE=1).
 **Upload candidate: submissions/ens2_all_tv_vr3.zip.**
+**LB 0.65621** (45m17s, 683 MB) = ens2_all_tv 0.6562 -> no transfer. The valid-period gain (+0.0015 V1 half B) and the
+train-period loss (V3 -0.0025) cancel on the test set: the test period is not simply "valid-like" (consistent with
+AUC 0.996 separability: it is likely a third period). Valid emphasis beyond x1 is neutral for test -> ens2_all_tv stays
+primary (same score, better V3). Lesson: half-B gains measure valid-period fit, not test fit; for shift questions,
+judge on V3 and V1/V2 together. Runtime 45m17s vs 43m36s for identical shapes -> scorer timing noise ~+-2 min.
