@@ -478,3 +478,19 @@ train sequences, so explicit importance weighting is not usable; repeating valid
 that shift between periods. Models trained on train only and scored on valid (out of period) measure robustness
 directly: `--drop-blocks raw` and `--drop-blocks raw vol` (zeroed after standardisation; export zeroes their weights,
 kernel unchanged). Keep only if V1/V2 rise (V3 is in-period and may drop).
+
+### 2026-10-21: how much valid emphasis (job wunder-vr6) and final x3 models (job wunder-vr-final)
+| comparison | V1 half B | V2 half B | V3 |
+|---|---|---|---|
+| gru_all_tvA_vr6 vs gru_all_tvA_vr3 (seed 0) | **-0.0026 (z -2.6)** | **-0.0046** | **-0.0045** |
+| gru_all_tvA_vr6_seed1 vs gru_all_tvA_vr3_seed1 | **-0.0041 (z -2.6)** | **-0.0045** | **-0.0041** |
+| gru_all_tv_vr3 vs gru_all_tv (V3 only; valid all seen) | | | -0.0024 (z -1.4) |
+| gru_all_tv_vr3_seed1 vs gru_all_tv_seed1 | | | -0.0027 (z -2.0) |
+x6 overfits the repeated sequences and loses everywhere -> the optimum is at or below x3 (x2 running: wunder-vr2).
+Final x3 models (train + all valid x3; V1/V2 seen): gru_all_tv_vr3 0.6955 / 0.5371 / 0.4453, _seed1 0.6969 / 0.5389 /
+0.4465. With all of valid repeated (36% of each epoch) the train holdout drops ~0.0025 (with half A only it was flat):
+x3 trades train-period accuracy for valid-period accuracy. Whether the test period is closer to valid is not known;
+the plain valid refit's LB gain (+0.0019) suggests it is at least partly.
+Packaged **submissions/ens2_all_tv_vr3** (same architecture/shape as ens2_all_tv -> same scorer runtime, ~44 min);
+checks running on a Kaggle CPU (job wunder-check-vr3: check_submission + tools/verify_numba.py vs torch).
+Expected LB if valid-like: ens2_all_tv 0.6562 + ~0.0013 (90% of +0.0015).
