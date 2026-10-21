@@ -430,3 +430,12 @@ model, so the teacher signal is much cleaner than y. Teacher V1/V2/V3 eval hit C
 Smoke student (32 seqs, both teachers, full recipe) ran at 137k rows/s vs ~165k without teacher.
 Launched job wunder-distil: distil_w1_full / distil_w3_full (full recipe + teacher weight 1 / 3, seed 0; paired with
 gru_all_full seed 0).
+
+### 2026-10-21: valid emphasis (job wunder-validw), paired vs gru_all_tvA (seed 0) on clean valid half B
+| name | change | V1 half B | V2 half B | V3 |
+|---|---|---|---|---|
+| gru_all_tvA_vr3 | train + valid A repeated 3x (0.6886 / 0.5244 / 0.4479 overall, A seen) | **+0.0016** (sigma 0.0019) | **+0.0031 (z 2.3)** | -0.0005 |
+| gru_all_tvA_vft | gru_all_tvA fine-tuned on valid A only, 2 ep lr 3e-4 | -0.0007 | +0.0009 | **-0.0041 (z -4.1)** |
+Fine-tuning on valid alone forgets the train distribution -> dropped. 3x valid weighting points the same way as the
+original valid-data gain (tvA vs full: V2 half B +0.0037); single seed, so a paired seed-1 replicate is running
+(job wunder-validw2: gru_all_tvA_seed1 vs gru_all_tvA_vr3_seed1).
