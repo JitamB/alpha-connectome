@@ -1,7 +1,7 @@
 #!/bin/bash
 # Usage: [EXTRA='files'] kaggle/push.sh JOB_SLUG 'RUN1|args...' ['RUN2|args...']   (RUN 'eval:NAME' = eval_torch args only)
 # Uploads the current code as private dataset jitamb/wunder-code (new version) and pushes a private GPU notebook
-# jitamb/<JOB_SLUG> running kaggle/run_job.py with the given runs (one per GPU).
+# jitamb/<JOB_SLUG> running kaggle/run_job.py with the given runs (one per GPU). GPU=false: CPU-only notebook (no GPU quota).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 K=~/.local/bin/kaggle; USER=jitamb; SLUG=$1; shift
@@ -28,7 +28,7 @@ PY
 JOBS="$JOBS" python3 -c "import os,sys; print(open('kaggle/run_job.py').read().replace('JOBS = []', 'JOBS = ' + os.environ['JOBS'], 1), end='')" > $B/kernel/run_job.py
 cat > $B/kernel/kernel-metadata.json <<META
 {"id": "$USER/$SLUG", "title": "$SLUG", "code_file": "run_job.py", "language": "python", "kernel_type": "script",
- "is_private": true, "enable_gpu": true, "enable_internet": true,
+ "is_private": true, "enable_gpu": ${GPU:-true}, "enable_internet": true,
  "dataset_sources": ["$USER/wunder-code"], "competition_sources": [], "kernel_sources": []}
 META
 grep '^JOBS' $B/kernel/run_job.py
