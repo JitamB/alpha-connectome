@@ -419,3 +419,14 @@ no student sequence gets an in-sample teacher prediction. Zero inference cost. J
 **H2 valid emphasis.** Valid data transferred to LB at ~5x the per-sequence value of train data (likely closer to the
 test period/mix). gru_all_tvA_vr3 = train + valid A repeated 3x; gru_all_tvA_vft = gru_all_tvA fine-tuned on valid A
 only (2 epochs, lr 3e-4). Both judged against gru_all_tvA on clean valid half B. Job wunder-validw.
+
+### 2026-10-21: privileged teachers (job wunder-teach, 2x T4, ~70 min)
+| name | data | monitor WP (holdout[:200], all rows) by epoch |
+|---|---|---|
+| teacher_h0 | train groups % 2 == 0, + future means h 1..1000 (1456 inputs, proj 128) | 0.792 / 0.823 / **0.856** |
+| teacher_h1 | train groups % 2 == 1 | 0.787 / 0.829 / **0.847** |
+(student models: ~0.445 on the same view.) The future-window inputs explain far more of the target than any causal
+model, so the teacher signal is much cleaner than y. Teacher V1/V2/V3 eval hit CUDA OOM at batch 32 (not needed).
+Smoke student (32 seqs, both teachers, full recipe) ran at 137k rows/s vs ~165k without teacher.
+Launched job wunder-distil: distil_w1_full / distil_w3_full (full recipe + teacher weight 1 / 3, seed 0; paired with
+gru_all_full seed 0).
