@@ -526,3 +526,11 @@ and eval-only pairs gru_all_full + drop_raw(vol)_full vs the seed pair (input-vi
 | pair_full_dropraw (gru_all_full + drop_raw_full) | same | 0.6823 | 0.5110 | 0.4493 | -0.0006 / -0.0003 / -0.0013 |
 Long TBPTT is closed (s4000 x4 and full x2 both flat). Input-view pairs average like seed pairs (no V1 gain).
 The lr has never been tuned: 2e-3 costs 0.007, so the optimum may be below 1e-3 -> job wunder-lr: lr5e4_full, lr7e4_full.
+
+### 2026-10-22: lower learning rates (job wunder-lr, full data, seed 0, paired vs gru_all_full at 1e-3)
+| name | V1 | V2 | V3 | paired delta (V1 / V2 / V3) |
+|---|---|---|---|---|
+| lr5e4_full | 0.6815 | 0.5086 | 0.4460 | +0.0005 (z 1.6) / +0.0001 / -0.0006 |
+| lr7e4_full | 0.6818 | 0.5089 | 0.4468 | +0.0008 (z 1.9) / +0.0005 / +0.0002 |
+The lr curve is flat below 1e-3 and steep above (2e-3: -0.0066). 7e-4 is marginally best but within ~1.3 run sd;
+replicates running (job wunder-lr2: lr7e4_full_seed1 / _seed2 vs gru_all_full_seed1 / _seed2).
