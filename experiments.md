@@ -505,3 +505,14 @@ train-period loss (V3 -0.0025) cancel on the test set: the test period is not si
 AUC 0.996 separability: it is likely a third period). Valid emphasis beyond x1 is neutral for test -> ens2_all_tv stays
 primary (same score, better V3). Lesson: half-B gains measure valid-period fit, not test fit; for shift questions,
 judge on V3 and V1/V2 together. Runtime 45m17s vs 43m36s for identical shapes -> scorer timing noise ~+-2 min.
+
+### 2026-10-22: shift-robust inputs (job wunder-dropblk, train only, seed 0) and valid x2 (job wunder-vr2)
+| name | V1 | V2 | V3 | paired delta vs gru_all_full (V1 / V2 / V3) |
+|---|---|---|---|---|
+| drop_raw_full | 0.6791 | 0.5060 | 0.4445 | -0.0019 / **-0.0024 (z -2.5)** / -0.0021 |
+| drop_rawvol_full | 0.6789 | 0.5079 | 0.4458 | -0.0021 / -0.0006 / -0.0008 |
+**H3 rejected:** removing the sequence-level levels loses even out of period (valid) -> they are signal, not shift noise.
+gru_all_tvA_vr2 / _seed1 vs vr3 on half B: V1 -0.0001 / +0.0002, V2 -0.0009 / -0.0003 -> x2 = x3; with x3 neutral on
+the LB, the valid-emphasis line is closed.
+Next (job wunder-tune): tbptt2k_full (batch 8 x chunk 2000, same rows per step), lr2e3_full (OneCycle max lr 2e-3),
+and eval-only pairs gru_all_full + drop_raw(vol)_full vs the seed pair (input-view diversity).
