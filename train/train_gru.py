@@ -424,7 +424,12 @@ def main():
                 else:
                     loss = weighted_mse(pred[:, lo:], Y[:, c + lo:c + args.chunk], R[:, c + lo:c + args.chunk])
                 total = loss
-                if teachers is not None:
+                if aux_head is not None:
+                    v = V[c:c + args.chunk]
+                    aux = (((aux_head(top) - A[:, c:c + args.chunk]) ** 2) * v).sum() / (v.sum() * len(top)).clamp_min(1.0)
+                    total = loss + args.aux_weight * aux
+                    aux_losses.append(aux.item())
+                if teachers is not None:  # after the aux block, which resets total = loss + aux
                     with torch.no_grad():
                         tp = torch.zeros_like(pred)
                         for k, (t, ix, XT) in enumerate(tsel):
@@ -434,11 +439,6 @@ def main():
                     distil = (wt * (pred[:, lo:] - tp[:, lo:].clamp(-CLIP, CLIP)) ** 2).sum() / wt.sum().clamp_min(1e-8)
                     total = total + args.teacher_weight * distil
                     teach_losses.append(distil.item())
-                if aux_head is not None:
-                    v = V[c:c + args.chunk]
-                    aux = (((aux_head(top) - A[:, c:c + args.chunk]) ** 2) * v).sum() / (v.sum() * len(top)).clamp_min(1.0)
-                    total = loss + args.aux_weight * aux
-                    aux_losses.append(aux.item())
                 if args.sum_weight:
                     ys = Y[:, c + lo:c + args.chunk].clamp(-CLIP, CLIP).sum(-1)
                     se = (pred[:, lo:].sum(-1) - ys) ** 2
