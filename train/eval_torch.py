@@ -45,7 +45,7 @@ def load(run: Path, weights: str, device, quant='none'):
     conv = (cfg['conv'][0], cfg['conv'][1], cfg['conv'][2:]) if cfg.get('conv') else None
     future = cfg.get('future_inputs') or []
     model = GRUModel(TRANSFORMS[cfg['features']][0] + 112 * len(future), cfg['hidden'], cfg['layers'], cfg['skip'], cfg.get('proj', 0), atoms, conv,
-                     cfg.get('cell', 'gru'))
+                     cfg.get('cell', 'gru'), cfg.get('drop_blocks') or ())
     model.load_state_dict(torch.load(run / weights, map_location=device))
     model.future = future  # privileged teacher inputs (non-causal), see train_gru --future-inputs
     if quant != 'none':

@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
 from fast_gru import pack  # noqa: E402
 sys.path.insert(0, str(ROOT / 'train'))
-from train_gru import make_atoms  # noqa: E402
+from train_gru import BLOCKS, make_atoms  # noqa: E402
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
@@ -34,7 +34,12 @@ if __name__ == '__main__':
         assert cfg['features'] == 'eng' and cfg['layers'] == 2 and cfg['skip'] and cfg.get('proj') and not cfg.get('conv') \
             and cfg.get('cell', 'gru') == 'gru', \
             f'{run}: unsupported architecture'
-        sds.append({k: v.numpy() for k, v in torch.load(run / args.weights, map_location='cpu').items()})
+        sd = {k: v.numpy().copy() for k, v in torch.load(run / args.weights, map_location='cpu').items()}
+        for b in cfg.get('drop_blocks') or ():  # trained with these inputs zeroed after standardisation
+            cols = slice(BLOCKS.index(b) * 112, (BLOCKS.index(b) + 1) * 112)
+            sd['proj.weight'][:, cols] = 0.0
+            sd['skip_head.weight'][:, cols] = 0.0
+        sds.append(sd)
     out = ROOT / 'submissions' / args.name
     out.mkdir(parents=True, exist_ok=True)
     np.savez(out / 'weights.npz', **pack(sds, make_atoms(), args.alpha, args.bf16))

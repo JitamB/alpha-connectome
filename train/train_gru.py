@@ -29,6 +29,7 @@ from gpu_features import torch_features  # noqa: E402
 from mask_model import mask_prob  # noqa: E402
 
 TRANSFORMS = {'raw': (112, None), 'eng': (N_FEATURES, batch_features)}
+BLOCKS = ('raw', 'diff', 'ema10', 'ema100', 'ema1000', 'vol')  # 112-column blocks of the engineered features, in order
 
 CLIP = 2.0
 # Targets are integers times one of four per-sequence steps (found 2026-10-15); the clipped values therefore lie on
@@ -73,10 +74,17 @@ class GRUModel(nn.Module):
     R = (kernel - 1) * sum(dilations) raw rows, carried as the last element of the hidden list (zeros at
     sequence start), so chunked training equals row-by-row streaming."""
 
-    def __init__(self, n_in=112, hidden=128, layers=2, skip=False, proj=0, atoms=0, conv=None, cell='gru'):
+    def __init__(self, n_in=112, hidden=128, layers=2, skip=False, proj=0, atoms=0, conv=None, cell='gru', drop=()):
         super().__init__()
         self.register_buffer('mean', torch.zeros(n_in))
         self.register_buffer('std', torch.ones(n_in))
+        # optional: engineered blocks zeroed after standardisation (export zeroes their weights)
+        self.register_buffer('drop', None, persistent=False)
+        if drop:
+            m = torch.ones(n_in)
+            for b in drop:
+                m[BLOCKS.index(b) * 112:(BLOCKS.index(b) + 1) * 112] = 0.0
+            self.register_buffer('drop', m, persistent=False)
         self.proj = nn.Linear(n_in, proj) if proj else None
         first = proj or n_in
         self.conv, self.conv_ctx = None, 0
@@ -94,6 +102,8 @@ class GRUModel(nn.Module):
         """x: (B, T, F); hidden: list of (1, B, H) or None -> prediction (B, T, 2), new hidden list
         (+ top GRU output (B, T, H) if return_top, for training-only auxiliary heads)."""
         x = (x - self.mean) / self.std
+        if self.drop is not None:
+            x = x * self.drop
         z, new = (x if self.proj is None else self.proj(x)), []
         if self.conv is not None:
             raw = x[..., :112]
@@ -287,6 +297,8 @@ def main():
                          'the other half (valid sequences: half-0 teacher)')
     ap.add_argument('--teacher-weight', type=float, default=1.0,
                     help='weight of the |y|-weighted MSE to the clipped teacher prediction (added to the target loss)')
+    ap.add_argument('--drop-blocks', nargs='+', choices=BLOCKS, default=[],
+                    help='zero these engineered feature blocks (e.g. raw vol: sequence-level levels that shift between periods)')
     ap.add_argument('--valid-repeat', type=int, default=1, help='repeat the --valid-groups sequences this often per epoch')
     ap.add_argument('--no-train', action='store_true', help='no train.parquet sequences (fine-tune on --valid-groups only)')
     args = ap.parse_args()
@@ -323,7 +335,7 @@ def main():
     atoms = torch.tensor(make_atoms())
     conv = (args.conv[0], args.conv[1], args.conv[2:]) if args.conv else None
     model = GRUModel(n_in + 112 * len(args.future_inputs), args.hidden, args.layers, args.skip, args.proj,
-                     len(atoms) if args.dist_weight else 0, conv, args.cell)
+                     len(atoms) if args.dist_weight else 0, conv, args.cell, args.drop_blocks)
     train_only = [g for g in groups if g < VALID_OFFSET] or train_groups()
     stats_groups = sorted(np.random.default_rng(args.seed + 1).choice(train_only, min(64, len(train_only)), replace=False).tolist())
 

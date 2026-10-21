@@ -465,3 +465,16 @@ break the plateau; not pursued further (w1 at most +0.0004 V1).
 sequences without hurting the train holdout. Valid-like data is worth more than train data for valid-like (and, by the
 LB transfer of the plain valid gain, test-like) sequences. Next: final models train + all valid x3 (2 seeds), and
 whether more emphasis (x6) helps further.
+Jobs: wunder-vr-final (gru_all_tv_vr3, _seed1: train + all valid x3) and wunder-vr6 (gru_all_tvA_vr6, _seed1).
+
+### 2026-10-21: domain shift train vs valid (CPU job wunder-domain, tools/domain_shift.py)
+Per-sequence summaries (mean, std, mean |diff| of the 112 raw columns), HistGB valid-vs-train, 5-fold CV:
+**AUC 0.996 overall and 0.994-0.999 within every asset class** -> valid sequences are a different period/regime,
+almost perfectly separable from train. Strongest single separators (mean within-class AUC): i1 volume levels and i1
+volume activity (mean / mean |diff| of columns 74-95: 0.70-0.74), some i0 volume levels (mean_40, mean_25).
+Out-of-fold train p(valid): median 7e-5, 95th pct 0.03 -> importance weights p/(1-p) would collapse onto a handful of
+train sequences, so explicit importance weighting is not usable; repeating valid (H2) is the practical form.
+**H3 (shift-robust inputs):** the raw-level block and the |diff|-activity block carry exactly the sequence-level levels
+that shift between periods. Models trained on train only and scored on valid (out of period) measure robustness
+directly: `--drop-blocks raw` and `--drop-blocks raw vol` (zeroed after standardisation; export zeroes their weights,
+kernel unchanged). Keep only if V1/V2 rise (V3 is in-period and may drop).
