@@ -516,3 +516,13 @@ gru_all_tvA_vr2 / _seed1 vs vr3 on half B: V1 -0.0001 / +0.0002, V2 -0.0009 / -0
 the LB, the valid-emphasis line is closed.
 Next (job wunder-tune): tbptt2k_full (batch 8 x chunk 2000, same rows per step), lr2e3_full (OneCycle max lr 2e-3),
 and eval-only pairs gru_all_full + drop_raw(vol)_full vs the seed pair (input-view diversity).
+
+### 2026-10-22: tuning round (job wunder-tune, full data, seed 0, paired vs gru_all_full)
+| name | change | V1 | V2 | V3 | paired delta (V1 / V2 / V3) |
+|---|---|---|---|---|---|
+| tbptt2k_full | batch 8 x TBPTT chunk 2000 (same rows/step), 1.45x slower | 0.6809 | 0.5087 | 0.4473 | -0.0001 / +0.0002 / +0.0007 -> nothing |
+| lr2e3_full | OneCycle max lr 2e-3 (was 1e-3) | 0.6744 | 0.4988 | 0.4365 | **-0.0066 / -0.0096 / -0.0101** |
+| pair_full_droprv (gru_all_full + drop_rawvol_full) | input-view diversity, vs the seed pair ens2_all_full | 0.6825 | 0.5126 | 0.4505 | -0.0004 / +0.0012 (z 3.3) / -0.0001 |
+| pair_full_dropraw (gru_all_full + drop_raw_full) | same | 0.6823 | 0.5110 | 0.4493 | -0.0006 / -0.0003 / -0.0013 |
+Long TBPTT is closed (s4000 x4 and full x2 both flat). Input-view pairs average like seed pairs (no V1 gain).
+The lr has never been tuned: 2e-3 costs 0.007, so the optimum may be below 1e-3 -> job wunder-lr: lr5e4_full, lr7e4_full.
