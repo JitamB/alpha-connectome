@@ -158,6 +158,33 @@ def aux_targets(X, horizons):
     return torch.cat(out, -1).float(), torch.cat(valid, -1)
 
 
+@torch.no_grad()
+def future_features(X, horizons):
+    """NON-CAUSAL teacher inputs from raw X (B, T, 112): mean(x[t+1..t+h]) - x[t] for each h (window cut at the
+    sequence end, 0 on the last row) -> (B, T, 112 * len(horizons)). Only for privileged teachers, never exported."""
+    x = X.double()
+    T = x.shape[1]
+    cs = torch.cat([torch.zeros_like(x[:, :1]), x.cumsum(1)], 1)
+    idx = torch.arange(T, device=X.device)
+    out = []
+    for h in horizons:
+        end = (idx + h).clamp(max=T - 1)
+        n = (end - idx).clamp_min(1).double()[None, :, None]
+        m = (cs[:, end + 1] - cs[:, idx + 1]) / n - x
+        m[:, -1] = 0.0
+        out.append(m.float())
+    return torch.cat(out, -1)
+
+
+def load_teacher(run, device):
+    """Frozen privileged teacher (a run trained with --future-inputs)."""
+    cfg = json.loads((Path(run) / 'config.json').read_text())
+    n_in = TRANSFORMS[cfg['features']][0] + 112 * len(cfg['future_inputs'])
+    m = GRUModel(n_in, cfg['hidden'], cfg['layers'], cfg['skip'], cfg['proj'], len(make_atoms()) if cfg.get('dist_weight') else 0)
+    m.load_state_dict(torch.load(Path(run) / 'best.pt', map_location=device))
+    return m.to(device).eval(), cfg['future_inputs']
+
+
 VALID_OFFSET = 100_000  # training ids >= this are valid.parquet row groups (id - VALID_OFFSET)
 VALID_SPLITS = {'none': [], 'A': range(0, 937), 'B': range(937, 1873), 'all': range(1873)}
 
@@ -188,14 +215,17 @@ def prefetch(groups_batches, transform=None, path=TRAIN, depth=1):
 
 
 @torch.no_grad()
-def monitor_score(model, groups, device, transform, gpu_features=False, batch=16):
+def monitor_score(model, groups, device, transform, gpu_features=False, batch=16, future=()):
     """WP on all need_prediction rows of a train-holdout slice (model selection; valid stays untouched)."""
     model.eval()
     moments = []
     batches = [groups[i:i + batch] for i in range(0, len(groups), batch)]
     for X, Y, _ in prefetch(batches, None if gpu_features else transform):
         X = torch.from_numpy(X).to(device)
-        pred, _ = model(torch_features(X) if gpu_features else X, None)
+        F = torch_features(X) if gpu_features else X
+        if future:
+            F = torch.cat([F, future_features(X, future)], -1)
+        pred, _ = model(F, None)
         pred = pred.float().cpu().numpy()
         need = np.arange(X.shape[1]) >= WARMUP
         moments += [seq_moments(y, p, need) for y, p in zip(Y, pred)]
@@ -248,10 +278,22 @@ def main():
                     help='causal CNN front-end on the raw block: CHANNELS KERNEL DILATION... (e.g. 32 4 1 4 16)')
     ap.add_argument('--cell', choices=['gru', 'lstm'], default='gru', help='recurrent cell of every layer')
     ap.add_argument('--init', help="fine-tune: start from another run's last.pt or best.pt (model incl. normalisation)")
+    ap.add_argument('--future-inputs', type=int, nargs='+', default=[],
+                    help='PRIVILEGED TEACHER: also feed mean(x[t+1..t+h]) - x[t] for each h (non-causal, never exported)')
+    ap.add_argument('--train-half', type=int, choices=[0, 1],
+                    help='train only on train row groups with group %% 2 == this (cross-fitted teachers)')
+    ap.add_argument('--teacher', nargs=2, metavar=('RUN_HALF0', 'RUN_HALF1'),
+                    help='distil from two cross-fitted teachers: a sequence with group %% 2 == k gets the teacher trained on '
+                         'the other half (valid sequences: half-0 teacher)')
+    ap.add_argument('--teacher-weight', type=float, default=1.0,
+                    help='weight of the |y|-weighted MSE to the clipped teacher prediction (added to the target loss)')
+    ap.add_argument('--valid-repeat', type=int, default=1, help='repeat the --valid-groups sequences this often per epoch')
+    ap.add_argument('--no-train', action='store_true', help='no train.parquet sequences (fine-tune on --valid-groups only)')
     args = ap.parse_args()
     if args.gpu_features is None:
         args.gpu_features = args.device.startswith('cuda') and args.features == 'eng'
     assert args.mask_model is None or (args.loss == 'wmse' and args.features == 'eng'), 'mask weights need wmse + eng'
+    assert not (args.future_inputs or args.teacher) or args.gpu_features, 'teacher paths need --gpu-features'
 
     args.out.mkdir(parents=True, exist_ok=True)
     torch.manual_seed(args.seed)
@@ -264,7 +306,11 @@ def main():
     groups = train_groups()
     if args.max_train_seqs:
         groups = sorted(rng.choice(groups, args.max_train_seqs, replace=False).tolist())
-    groups += [VALID_OFFSET + g for g in VALID_SPLITS[args.valid_groups]]
+    if args.train_half is not None:
+        groups = [g for g in groups if g % 2 == args.train_half]
+    if args.no_train:
+        groups = []
+    groups += [VALID_OFFSET + g for g in VALID_SPLITS[args.valid_groups]] * args.valid_repeat
     monitor = holdout_groups()
     if args.classes:
         cls = json.loads((Path(__file__).resolve().parents[1] / 'splits' / 'train_classes.json').read_text())
@@ -276,12 +322,17 @@ def main():
     n_in, transform = TRANSFORMS[args.features]
     atoms = torch.tensor(make_atoms())
     conv = (args.conv[0], args.conv[1], args.conv[2:]) if args.conv else None
-    model = GRUModel(n_in, args.hidden, args.layers, args.skip, args.proj, len(atoms) if args.dist_weight else 0, conv,
-                     args.cell)
-    train_only = [g for g in groups if g < VALID_OFFSET]
+    model = GRUModel(n_in + 112 * len(args.future_inputs), args.hidden, args.layers, args.skip, args.proj,
+                     len(atoms) if args.dist_weight else 0, conv, args.cell)
+    train_only = [g for g in groups if g < VALID_OFFSET] or train_groups()
     stats_groups = sorted(np.random.default_rng(args.seed + 1).choice(train_only, min(64, len(train_only)), replace=False).tolist())
-    sample = np.concatenate([(s.X if transform is None else transform(s.X))[WARMUP::10]
-                             for s in iter_sequences(TRAIN, stats_groups)]).astype(np.float64)
+
+    def stats_rows(x):
+        f = x if transform is None else transform(x)
+        if args.future_inputs:
+            f = np.hstack([f, future_features(torch.from_numpy(x)[None], args.future_inputs)[0].numpy()])
+        return f[WARMUP::10]
+    sample = np.concatenate([stats_rows(s.X) for s in iter_sequences(TRAIN, stats_groups)]).astype(np.float64)
     model.mean.copy_(torch.from_numpy(sample.mean(0)).float())
     model.std.copy_(torch.from_numpy(sample.std(0)).float().clamp_min(1e-6))
     del sample
@@ -293,6 +344,9 @@ def main():
     n_lag = len(args.lag_targets) + len(args.pmean_targets)
     lag_head = nn.Linear(args.hidden, 2 * n_lag).to(device) if args.lag_weight and n_lag else None
     mw = {k: v.to(device) for k, v in torch.load(args.mask_model).items()} if args.mask_model else None
+    teachers = [load_teacher(r, device) for r in args.teacher] if args.teacher else None
+    for t, _ in teachers or []:
+        t.requires_grad_(False)
     if args.init:  # last.pt restores the training heads too; a plain best.pt leaves them freshly initialised
         ck = torch.load(args.init, map_location=device, weights_only=False)
         model.load_state_dict(ck.get('model', ck))
@@ -325,7 +379,7 @@ def main():
     for epoch in range(start_epoch, args.epochs):
         order = np.random.default_rng(args.seed + epoch).permutation(groups)
         batches = [sorted(order[i:i + args.batch].tolist()) for i in range(0, len(order), args.batch)]
-        t0, losses, aux_losses, lag_losses, dist_losses = time.time(), [], [], [], []
+        t0, losses, aux_losses, lag_losses, dist_losses, teach_losses = time.time(), [], [], [], [], []
         for b, (X, Y, M) in enumerate(prefetch(batches, None if args.gpu_features else transform)):
             X, Y = torch.from_numpy(X).to(device), torch.from_numpy(Y).to(device)
             if aux_head is not None:
@@ -333,8 +387,20 @@ def main():
                 if aux_std is None:
                     aux_std = ((A ** 2 * V).sum((0, 1)) / (V.sum(0) * len(A))).sqrt().clamp_min(1e-6)
                 A = A / aux_std
+            Xraw = X
             if args.gpu_features:
                 X = torch_features(X)
+            if teachers is not None:  # per sequence: the teacher that did not see it (see --teacher)
+                order = [g for g in batches[b] if g < VALID_OFFSET] + [g for g in batches[b] if g >= VALID_OFFSET]
+                pick = [0 if g >= VALID_OFFSET else 1 - g % 2 for g in order]
+                tsel = []
+                for j, (t, fut) in enumerate(teachers):
+                    ix = torch.tensor([i for i, k in enumerate(pick) if k == j], device=device, dtype=torch.long)
+                    if len(ix):
+                        tsel.append((t, ix, torch.cat([X[ix], future_features(Xraw[ix], fut)], -1)))
+                th = [None] * len(tsel)
+            if args.future_inputs:
+                X = torch.cat([X, future_features(Xraw, args.future_inputs)], -1)
             if mw is not None:
                 with torch.no_grad():
                     R = args.mask_eps + mask_prob(X, mw)
@@ -358,6 +424,16 @@ def main():
                 else:
                     loss = weighted_mse(pred[:, lo:], Y[:, c + lo:c + args.chunk], R[:, c + lo:c + args.chunk])
                 total = loss
+                if teachers is not None:
+                    with torch.no_grad():
+                        tp = torch.zeros_like(pred)
+                        for k, (t, ix, XT) in enumerate(tsel):
+                            tp[ix], th[k] = t(XT[:, c:c + args.chunk], th[k])
+                    yc = Y[:, c + lo:c + args.chunk].clamp(-CLIP, CLIP)
+                    wt = yc.abs() if mw is None else yc.abs() * R[:, c + lo:c + args.chunk, None]
+                    distil = (wt * (pred[:, lo:] - tp[:, lo:].clamp(-CLIP, CLIP)) ** 2).sum() / wt.sum().clamp_min(1e-8)
+                    total = total + args.teacher_weight * distil
+                    teach_losses.append(distil.item())
                 if aux_head is not None:
                     v = V[c:c + args.chunk]
                     aux = (((aux_head(top) - A[:, c:c + args.chunk]) ** 2) * v).sum() / (v.sum() * len(top)).clamp_min(1.0)
@@ -399,10 +475,11 @@ def main():
                 rate = (b + 1) * args.batch * 20_000 / (time.time() - t0)
                 aux_note = (f' aux {np.mean(aux_losses[-200:]):.4f}' if aux_losses else '') + \
                            (f' lag {np.mean(lag_losses[-200:]):.4f}' if lag_losses else '') + \
-                           (f' ce {np.mean(dist_losses[-200:]):.4f}' if dist_losses else '')
+                           (f' ce {np.mean(dist_losses[-200:]):.4f}' if dist_losses else '') + \
+                           (f' teach {np.mean(teach_losses[-200:]):.4f}' if teach_losses else '')
                 print(f'epoch {epoch} batch {b + 1}/{len(batches)} loss {np.mean(losses[-200:]):.4f}{aux_note} '
                       f'lr {sched.get_last_lr()[0]:.2e} {rate / 1e3:.0f}k rows/s', flush=True)
-        score = monitor_score(model, monitor, device, transform, args.gpu_features)
+        score = monitor_score(model, monitor, device, transform, args.gpu_features, future=args.future_inputs)
         history.append({'epoch': epoch, 'loss': float(np.mean(losses)), 'monitor_wp': score, 'minutes': (time.time() - t0) / 60})
         print(f'== epoch {epoch}: monitor WP (holdout, all rows) {score:.5f}', flush=True)
         if score > best:

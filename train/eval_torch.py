@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'train')]
 from evaluate import evaluate, print_summary  # noqa: E402
 from gpu_features import torch_features  # noqa: E402
-from train_gru import TRANSFORMS, GRUModel, decode_dist, make_atoms  # noqa: E402
+from train_gru import TRANSFORMS, GRUModel, decode_dist, future_features, make_atoms  # noqa: E402
 
 
 def quantize(w, mode):
@@ -43,9 +43,11 @@ def load(run: Path, weights: str, device, quant='none'):
     cfg = json.loads((run / 'config.json').read_text())
     atoms = len(make_atoms()) if cfg.get('dist_weight') else 0
     conv = (cfg['conv'][0], cfg['conv'][1], cfg['conv'][2:]) if cfg.get('conv') else None
-    model = GRUModel(TRANSFORMS[cfg['features']][0], cfg['hidden'], cfg['layers'], cfg['skip'], cfg.get('proj', 0), atoms, conv,
+    future = cfg.get('future_inputs') or []
+    model = GRUModel(TRANSFORMS[cfg['features']][0] + 112 * len(future), cfg['hidden'], cfg['layers'], cfg['skip'], cfg.get('proj', 0), atoms, conv,
                      cfg.get('cell', 'gru'))
     model.load_state_dict(torch.load(run / weights, map_location=device))
+    model.future = future  # privileged teacher inputs (non-causal), see train_gru --future-inputs
     if quant != 'none':
         quantize_model(model, quant)
     return model.to(device).eval(), cfg['features'] == 'eng'
@@ -78,7 +80,8 @@ if __name__ == '__main__':
     def predict(Xb):
         X = torch.from_numpy(Xb).to(device)
         F = torch_features(X) if any(eng for _, eng in models) else None
-        preds = [output(m, F if eng else X) for m, eng in models]
+        preds = [output(m, torch.cat([F, future_features(X, m.future)], -1) if m.future else F if eng else X)
+                 for m, eng in models]
         return torch.stack(preds).mean(0).float().cpu().numpy()
 
     print_summary(args.name, evaluate(predict, args.name, max_seqs=args.max_seqs, batch=args.batch))
