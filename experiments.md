@@ -567,3 +567,7 @@ not meaningful there; same shapes as ens2_all_tv -> ~44 min). submissions/ens2_a
 More optimiser steps help, fewer hurt -- at the lower lr the recipe is under-trained (monitor 0.4478 at epoch 3 and 4;
 at lr 1e-3 / old recipe 5 epochs gave nothing). Next (job wunder-epochs): lr7e4_e4_full_seed1 (replicate vs
 lr7e4_full_seed1) and lr7e4_e5_full (vs e4).
+
+### 2026-10-22: LB of ens2_all_tv_lr7e4
+**LB 0.65655** (43m22s, 683 MB): +0.00035 over ens2_all_tv (0.6562), as expected from the pair gain (+0.0005 V1,
+~90% transfer). New best by a hair; within scorer noise on its own, but consistent with the 3-seed local evidence.
