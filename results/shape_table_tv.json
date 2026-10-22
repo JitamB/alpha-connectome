@@ -1,0 +1,13 @@
+{
+ "rows": 116800000.0,
+ "shapes": 265508,
+ "kept": 95164,
+ "row_coverage_of_kept": 0.9985415753424658,
+ "mixed_class_shapes": 2,
+ "per_class_shapes": [
+  76317,
+  13407,
+  4885,
+  555
+ ]
+}
