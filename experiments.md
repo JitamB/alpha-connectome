@@ -571,3 +571,14 @@ lr7e4_full_seed1) and lr7e4_e5_full (vs e4).
 ### 2026-10-22: LB of ens2_all_tv_lr7e4
 **LB 0.65655** (43m22s, 683 MB): +0.00035 over ens2_all_tv (0.6562), as expected from the pair gain (+0.0005 V1,
 ~90% transfer). New best by a hair; within scorer noise on its own, but consistent with the 3-seed local evidence.
+
+### 2026-10-22: epochs at lr 7e-4 (job wunder-epochs)
+| comparison | V1 | V2 | V3 |
+|---|---|---|---|
+| lr7e4_e4_full_seed1 vs lr7e4_full_seed1 (4 vs 3 epochs) | -0.0006 | +0.0010 | +0.0020 |
+| (seed 0, earlier) lr7e4_e4_full vs lr7e4_full | +0.0008 | +0.0020 | +0.0021 |
+| mean of 2 seeds | **+0.0001** | **+0.0015** | **+0.0020** |
+| lr7e4_e5_full vs lr7e4_e4_full (5 vs 4) | -0.0004 | -0.0007 | -0.0008 |
+4 epochs: all-rows views (V2, V3) up in both seeds, the masked V1 flat; 5 epochs past the peak. Not a V1 win, but V3
+is the only clean view for train + valid models and moves +0.002 in both seeds -> one 4-epoch final pair as a
+candidate (job wunder-tv-e4: gru_all_tv_lr7e4_e4 / _seed1 + eval of the train-only e4 pair vs pair_lr7e4).
