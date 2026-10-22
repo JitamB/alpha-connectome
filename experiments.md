@@ -35,6 +35,7 @@ Runtime: M2 us/row from `src/check_submission.py`; projected scorer minutes = us
 | regularisation: dropout 0.1, weight decay 1e-3 | dropout −0.0009 V1 (2 seeds), wd flat | 10-22 round 2 | — |
 | activity/range aux head (future excursions, price-change counts, mean abs y) | V1 −0.0002 main effect (2×2, 2 seeds) | 10-22 round 2 | — |
 | exact-shape lookup (S/D per exact i0 shape): post-hoc ridge, stacking gate, HistGB | V1 +0.00004 / +0.00001 (G1), HistGB worse | 10-22 corr, shape_gate | the GRU already has it |
+| class-conditional joint tick-pair CE and metric-aware joint decoder | joint loss V1 −0.00012 / c3 −0.00063; decoded output V1 −0.00214 | 10-22 jointpair (2 seeds) | causal c3 transition representation, not a larger output distribution |
 
 | date | name | model | V1 | V2 | V3 | M2 us/row (proj. min) | LB | notes |
 |---|---|---|---|---|---|---|---|---|
@@ -625,6 +626,22 @@ Seen-vs-unseen check from saved moments: gru_all_tvA vs gru_all_full on valid ha
 +0.0007; seed 1 +0.0061 / +0.0004 (class 3: +0.009 / +0.015 seen) -> a real memorisation gap; regularisation untested.
 
 ## 2026-10-22: research review, round 2 (new session; workflow in .claude/skills/connectome-experiment/SKILL.md)
+
+## 2026-10-22: preregistration — structured joint tick-pair head (Experiment 1)
+- **Hypothesis:** a class-conditional joint distribution over the clipped target pair will teach/use the discrete tick-grid and t0/t1 coupling better than independent per-target atom CE. Decode the marginals with the metric-optimal `E[|y|y] / E[|y|]` rule; retain the regression head as the other candidate output. This is a different hypothesis from the rejected sum-MSE and marginal-distribution output: the unit is the *joint pair*, and scoring is judged on the decoded pair distribution.
+- **Primary comparison:** two train-only runs, seeds 0 and 1, paired against `lr7e4_full` / `lr7e4_full_seed1`; same base recipe (lr 7e-4, 3 epochs, mask proxy, lag/feature auxiliaries and marginal distribution auxiliary) plus a joint-pair auxiliary loss. Also evaluate joint-decoded output vs regression output from each candidate. Primary view V1 on clean valid sequences; class-3 V1 is the mechanism check. V2 and V3 can veto; report each class and V1t sensitivity.
+- **Decision rule:** candidate only if the two-seed mean paired V1 gain is at least +0.0009, neither seed is below −0.0006, class-3 V1 improves, and V2/V3 are not below −2 SE. A joint-decoded output must beat the regression output on clean V1 to justify any inference-path cost. If the joint loss does not improve class 3 or the pair decode is flat, close this exact formulation.
+- **No leakage:** use train-only runs for the primary comparison; all tuning/model selection stays sequence-grouped. Do not use valid labels in fitting. Only refit on train+valid after the screen passes.
+- **Cost:** code change and CPU-free orchestration on the Mac; Kaggle fetch ~12 min, two 3-epoch T4 training runs in parallel ~75 min, GPU evaluation ~10 min, total target ~1h45m. No local parquet reads, training, evaluation, or GPU work. Inference output size/runtime to be measured on Kaggle only if the joint-decoded output wins.
+
+### Result — REJECT (Kaggle jobs `theconqueror01/wunder-jointpair-exp1`, `theconqueror01/wunder-jointpair-eval`)
+
+| output / comparison | V1 | V2 | V3 | paired result vs base |
+|---|---:|---:|---:|---|
+| regression head, seed 0 / 1 | 0.68163 / 0.68212 | 0.50926 / 0.50941 | 0.44777 / 0.44893 | V1 **−0.00012** mean (SE 0.00052); class 3 **−0.00063** |
+| joint-pair decoded, seed 0 / 1 | 0.67886 / 0.68084 | 0.50410 / 0.50628 | 0.44554 / 0.44609 | vs candidate regression: V1 **−0.00203**, V2 **−0.00414**, V3 **−0.00253**; vs base V1 **−0.00214** |
+
+The class router is accurate on 99.41% / 99.15% of V1 sequences (98.75% / 98.63% V3), so wrong class routing does not explain the failure. The joint CE changes neither the regression solution nor class 3 in the required direction, while metric-aware marginal decoding from the learned joint distribution is strongly worse on all views. Close the class-conditional joint tick-pair loss and this exact decoder; any future use of target coupling needs a representation tied to a causal c3 state transition, rather than a larger output distribution.
 
 The review (three independent specialists plus cross-review) had these key findings:
 - class 3 holds 66% of the residual error;

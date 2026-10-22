@@ -1,0 +1,44 @@
+== jointpair_s0_pair
+  V1: WP 0.678856  (t0 0.6737, t1 0.6840)  sigma 0.0063  seqs 1873
+  V2: WP 0.504096  (t0 0.5041, t1 0.5041)  sigma 0.0038  seqs 1873
+  V3: WP 0.445544  (t0 0.4433, t1 0.4478)  sigma 0.0067  seqs 800
+  eval time 140.4 s
+== jointpair_s1_pair
+  V1: WP 0.680843  (t0 0.6771, t1 0.6846)  sigma 0.0062  seqs 1873
+  V2: WP 0.506283  (t0 0.5066, t1 0.5060)  sigma 0.0037  seqs 1873
+  V3: WP 0.446090  (t0 0.4430, t1 0.4492)  sigma 0.0067  seqs 800
+  eval time 132.3 s
+jointpair_s0 class detector valid: 1862/1873 = 0.994127
+jointpair_s0 class detector holdout: 790/800 = 0.987500
+jointpair_s1 class detector valid: 1857/1873 = 0.991458
+jointpair_s1 class detector holdout: 789/800 = 0.986250
+== jointpair_s0,jointpair_s1 vs lr7e4_full,lr7e4_full_seed1
+  V1    per seed [-0.00015, -8e-05]  mean -0.00012  SE 0.00052  z_fix -0.3  z_gen -0.2
+  V2    per seed [0.00031, 0.00084]  mean +0.00057  SE 0.00059  z_fix 1.2  z_gen 1.0
+  V3    per seed [0.00094, 0.00067]  mean +0.00081  SE 0.00078  z_fix 2.5  z_gen 1.0
+  V1t   per seed [-0.00032, -0.00027]  mean -0.00030  SE 0.00056  z_fix -0.6  z_gen -0.5
+  V1c0  per seed [-0.00099, 0.0009]  mean -0.00004  SE 0.00058  z_fix None  z_gen -0.1
+  V1c1  per seed [0.00073, -0.00194]  mean -0.00061  SE 0.00041  z_fix None  z_gen -1.5
+  V1c2  per seed [0.00194, 0.00144]  mean +0.00169  SE 0.00062  z_fix None  z_gen 2.8
+  V1c3  per seed [-0.00046, -0.00079]  mean -0.00063  SE 0.00082  z_fix None  z_gen -0.8
+   verdict: REJECT
+== jointpair_s0_pair,jointpair_s1_pair vs jointpair_s0,jointpair_s1
+  V1    per seed [-0.00278, -0.00128]  mean -0.00203  SE 0.00079  z_fix -4.6  z_gen -2.6
+  V2    per seed [-0.00516, -0.00313]  mean -0.00414  SE 0.00077  z_fix -8.4  z_gen -5.4
+  V3    per seed [-0.00223, -0.00284]  mean -0.00253  SE 0.00076  z_fix -8.0  z_gen -3.3
+  V1t   per seed [-0.00286, -0.00135]  mean -0.00211  SE 0.00079  z_fix -4.6  z_gen -2.7
+  V1c0  per seed [-0.00554, -0.00261]  mean -0.00408  SE 0.00209  z_fix None  z_gen -2.0
+  V1c1  per seed [-0.00224, -0.00066]  mean -0.00145  SE 0.00065  z_fix None  z_gen -2.2
+  V1c2  per seed [-3e-05, -0.00068]  mean -0.00036  SE 0.00061  z_fix None  z_gen -0.6
+  V1c3  per seed [-0.0021, -0.00068]  mean -0.00139  SE 0.00084  z_fix None  z_gen -1.7
+   verdict: REJECT (veto V2,V3)
+== jointpair_s0_pair,jointpair_s1_pair vs lr7e4_full,lr7e4_full_seed1
+  V1    per seed [-0.00293, -0.00136]  mean -0.00214  SE 0.00071  z_fix -4.9  z_gen -3.0
+  V2    per seed [-0.00485, -0.00229]  mean -0.00357  SE 0.00078  z_fix -7.2  z_gen -4.6
+  V3    per seed [-0.00128, -0.00218]  mean -0.00173  SE 0.00101  z_fix -5.4  z_gen -1.7
+  V1t   per seed [-0.00319, -0.00162]  mean -0.00240  SE 0.00073  z_fix -5.2  z_gen -3.3
+  V1c0  per seed [-0.00653, -0.00171]  mean -0.00412  SE 0.00159  z_fix None  z_gen -2.6
+  V1c1  per seed [-0.00151, -0.0026]  mean -0.00206  SE 0.00072  z_fix None  z_gen -2.8
+  V1c2  per seed [0.00192, 0.00076]  mean +0.00134  SE 0.00082  z_fix None  z_gen 1.6
+  V1c3  per seed [-0.00256, -0.00147]  mean -0.00201  SE 0.00106  z_fix None  z_gen -1.9
+   verdict: REJECT (veto V2)

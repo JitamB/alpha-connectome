@@ -46,6 +46,18 @@ def make_atoms():
     return sorted(vals)
 
 
+def make_class_atoms():
+    """Exact clipped target support for each asset tick class."""
+    out = []
+    for step in STEPS:
+        n = int(np.ceil(CLIP / step)) + 1
+        vals = {-CLIP, 0.0, CLIP}
+        for k in range(-n, n + 1):
+            vals.add(float(np.clip(k * step, -CLIP, CLIP)))
+        out.append(sorted(vals))
+    return out
+
+
 def decode_dist(logits, atoms):
     """(..., A) logits -> metric-optimal point prediction E[|y| y] / E[|y|] under the predicted distribution."""
     w = torch.softmax(logits, -1) * atoms.abs()
@@ -76,7 +88,7 @@ class GRUModel(nn.Module):
     sequence start), so chunked training equals row-by-row streaming."""
 
     def __init__(self, n_in=112, hidden=128, layers=2, skip=False, proj=0, atoms=0, conv=None, cell='gru', drop=(),
-                 dropout=0.0):
+                 dropout=0.0, pair_atoms=None):
         super().__init__()
         self.p_drop = dropout  # training-only dropout on the input of every recurrent layer (no parameters)
         self.register_buffer('mean', torch.zeros(n_in))
@@ -100,6 +112,8 @@ class GRUModel(nn.Module):
         self.reg_head = nn.Linear(hidden, 2)
         self.skip_head = nn.Linear(n_in, 2) if skip else None
         self.dist_head = nn.Linear(hidden, 2 * atoms) if atoms else None
+        self.class_head = nn.Linear(hidden, len(STEPS)) if pair_atoms is not None else None
+        self.pair_heads = nn.ModuleList([nn.Linear(hidden, len(a) ** 2) for a in pair_atoms]) if pair_atoms is not None else None
 
     def forward(self, x, hidden, return_top=False):
         """x: (B, T, F); hidden: list of (1, B, H) or None -> prediction (B, T, 2), new hidden list
@@ -325,6 +339,10 @@ def main():
                     help='with --mask-model and --valid-groups: weight valid rows by eps + the official is_scored mask')
     ap.add_argument('--dist-weight', type=float, default=0.0,
                     help='weight of a cross-entropy loss for a distributional head over the target atoms (0 = off)')
+    ap.add_argument('--pair-weight', type=float, default=0.0,
+                    help='weight of class-conditional joint CE over clipped (t0,t1) tick pairs (0 = off)')
+    ap.add_argument('--class-weight', type=float, default=0.1,
+                    help='per-row asset-class CE weight when --pair-weight is enabled')
     ap.add_argument('--sum-weight', type=float, default=0.0,
                     help='extra MSE on the predicted sum t0 + t1 (the cost-like part; clipped targets; 0 = off)')
     ap.add_argument('--valid-groups', choices=list(VALID_SPLITS), default='none',
@@ -379,6 +397,10 @@ def main():
         groups = []
     groups += [VALID_OFFSET + g for g in VALID_SPLITS[args.valid_groups]] * args.valid_repeat
     monitor = holdout_groups()
+    train_classes = json.loads((Path(__file__).resolve().parents[1] / 'splits' / 'train_classes.json').read_text())
+    valid_classes = json.loads((Path(__file__).resolve().parents[1] / 'splits' / 'valid_classes.json').read_text())['cls']
+    def class_of(g):
+        return train_classes[g] if g < VALID_OFFSET else valid_classes[g - VALID_OFFSET]
     if args.classes:
         cls = json.loads((Path(__file__).resolve().parents[1] / 'splits' / 'train_classes.json').read_text())
         assert args.valid_groups == 'none', 'class filter covers train groups only'
@@ -388,9 +410,10 @@ def main():
 
     n_in, transform = TRANSFORMS[args.features]
     atoms = torch.tensor(make_atoms())
+    pair_atoms = make_class_atoms() if args.pair_weight else None
     conv = (args.conv[0], args.conv[1], args.conv[2:]) if args.conv else None
     model = GRUModel(n_in + SHAPE_N * (table is not None) + 112 * len(args.future_inputs), args.hidden, args.layers, args.skip, args.proj,
-                     len(atoms) if args.dist_weight else 0, conv, args.cell, args.drop_blocks, args.dropout)
+                     len(atoms) if args.dist_weight else 0, conv, args.cell, args.drop_blocks, args.dropout, pair_atoms)
     train_only = [g for g in groups if g < VALID_OFFSET] or train_groups()
     stats_groups = sorted(np.random.default_rng(args.seed + 1).choice(train_only, min(64, len(train_only)), replace=False).tolist())
 
@@ -407,6 +430,7 @@ def main():
     del sample
     model = model.to(device)
     atoms = atoms.to(device)
+    pair_atom_tensors = [torch.as_tensor(a, device=device, dtype=torch.float32) for a in pair_atoms] if pair_atoms else None
     mids = (atoms[1:] + atoms[:-1]) / 2
     aux_head = nn.Linear(args.hidden, len(AUX_COLS) * len(args.aux_horizons)).to(device) if args.aux_weight else None
     aux_std = None
@@ -457,9 +481,10 @@ def main():
     for epoch in range(start_epoch, args.epochs):
         order = np.random.default_rng(args.seed + epoch).permutation(groups)
         batches = [sorted(order[i:i + args.batch].tolist()) for i in range(0, len(order), args.batch)]
-        t0, losses, aux_losses, lag_losses, dist_losses, teach_losses, act_losses = time.time(), [], [], [], [], [], []
+        t0, losses, aux_losses, lag_losses, dist_losses, teach_losses, act_losses, pair_losses, class_losses = time.time(), [], [], [], [], [], [], [], []
         for b, (X, Y, M) in enumerate(prefetch(batches, None if args.gpu_features else transform, table=table)):
             X, Y = torch.from_numpy(X).to(device), torch.from_numpy(Y).to(device)
+            batch_cls = np.asarray([class_of(g) for g in batches[b]], dtype=np.int64) if pair_atoms is not None else None
             if aux_head is not None:
                 A, V = aux_targets(X[..., :112], args.aux_horizons)  # raw block comes first in both layouts
                 if aux_std is None:
@@ -538,6 +563,30 @@ def main():
                     dist = ce.mean()
                     total = total + args.dist_weight * dist
                     dist_losses.append(dist.item())
+                if model.pair_heads is not None:
+                    class_target = torch.as_tensor(batch_cls, device=device, dtype=torch.long)
+                    class_logits = model.class_head(top)
+                    class_loss = nn.functional.cross_entropy(
+                        class_logits.reshape(-1, len(STEPS)),
+                        class_target[:, None].expand(-1, top.shape[1]).reshape(-1))
+                    pair_loss = pred.new_zeros(())
+                    target_y = Y[:, c + lo:c + args.chunk].clamp(-CLIP, CLIP)
+                    for ci, (support, av) in enumerate(zip(pair_atoms, pair_atom_tensors)):
+                        ix = torch.where(class_target == ci)[0]
+                        if ix.numel() == 0:
+                            continue
+                        yy = target_y[ix]
+                        j0 = (yy[..., 0, None] - av).abs().argmin(-1)
+                        j1 = (yy[..., 1, None] - av).abs().argmin(-1)
+                        labels = j0 * len(support) + j1
+                        logits = model.pair_heads[ci](top[ix, lo:])
+                        ce = nn.functional.cross_entropy(
+                            logits.reshape(-1, len(support) ** 2), labels.reshape(-1), reduction='none').view(labels.shape)
+                        rw = R[ix, c + lo:c + args.chunk] if mw is not None else torch.ones_like(ce)
+                        pair_loss = pair_loss + (ce * rw).sum() / rw.sum().clamp_min(1.0) * (ix.numel() / len(batch_cls))
+                    total = total + args.pair_weight * pair_loss + args.class_weight * class_loss
+                    pair_losses.append(pair_loss.item())
+                    class_losses.append(class_loss.item())
                 if lag_head is not None:
                     yl = YL[:, c + lo:c + args.chunk]
                     wl = yl.abs()
@@ -565,7 +614,8 @@ def main():
                            (f' lag {np.mean(lag_losses[-200:]):.4f}' if lag_losses else '') + \
                            (f' ce {np.mean(dist_losses[-200:]):.4f}' if dist_losses else '') + \
                            (f' teach {np.mean(teach_losses[-200:]):.4f}' if teach_losses else '') + \
-                           (f' act {np.mean(act_losses[-200:]):.4f}' if act_losses else '')
+                           (f' act {np.mean(act_losses[-200:]):.4f}' if act_losses else '') + \
+                           (f' pair {np.mean(pair_losses[-200:]):.4f} class {np.mean(class_losses[-200:]):.4f}' if pair_losses else '')
                 print(f'epoch {epoch} batch {b + 1}/{len(batches)} loss {np.mean(losses[-200:]):.4f}{aux_note} '
                       f'lr {sched.get_last_lr()[0]:.2e} {rate / 1e3:.0f}k rows/s', flush=True)
         score = monitor_score(model, monitor, device, transform, args.gpu_features, future=args.future_inputs, table=table)

@@ -59,3 +59,8 @@ for run, p in procs:
     os.makedirs(f'{OUT}/results', exist_ok=True)
     for f in glob.glob(f'results/{run}*'):
         shutil.copy(f, f'{OUT}/results/')
+# Late-stage evaluation drivers can create multiple named result files. Keep those too.
+os.makedirs(f'{OUT}/results', exist_ok=True)
+for f in glob.glob('results/*'):
+    if f.endswith(('.npz', '.json')):
+        shutil.copy(f, f'{OUT}/results/')

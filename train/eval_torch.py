@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'train')]
 from evaluate import evaluate, print_summary  # noqa: E402
 from gpu_features import torch_features  # noqa: E402
-from train_gru import TRANSFORMS, GRUModel, decode_dist, future_features, make_atoms  # noqa: E402
+from train_gru import TRANSFORMS, GRUModel, decode_dist, future_features, make_atoms, make_class_atoms  # noqa: E402
 from shape_lookup import N_FEAT as SHAPE_N, features as shape_features, load_table  # noqa: E402
 
 
@@ -46,8 +46,9 @@ def load(run: Path, weights: str, device, quant='none'):
     conv = (cfg['conv'][0], cfg['conv'][1], cfg['conv'][2:]) if cfg.get('conv') else None
     future = cfg.get('future_inputs') or []
     table = load_table(ROOT / cfg['shape_table']) if cfg.get('shape_table') else None
+    pair_atoms = make_class_atoms() if cfg.get('pair_weight') else None
     model = GRUModel(TRANSFORMS[cfg['features']][0] + SHAPE_N * (table is not None) + 112 * len(future), cfg['hidden'], cfg['layers'], cfg['skip'], cfg.get('proj', 0), atoms, conv,
-                     cfg.get('cell', 'gru'), cfg.get('drop_blocks') or ())
+                     cfg.get('cell', 'gru'), cfg.get('drop_blocks') or (), pair_atoms=pair_atoms)
     model.load_state_dict(torch.load(run / weights, map_location=device))
     model.future = future  # privileged teacher inputs (non-causal), see train_gru --future-inputs
     model.table = table    # exact-shape lookup inputs, see train_gru --shape-table
@@ -65,8 +66,8 @@ if __name__ == '__main__':
     ap.add_argument('--max-seqs', type=int, help='quick check on the first N sequences of each view')
     ap.add_argument('--quant', choices=['none', 'bf16', 'int8'], default='none',
                     help='simulate reduced-precision weight storage (fp32 compute)')
-    ap.add_argument('--output', choices=['reg', 'dist', 'blend'], default='reg',
-                    help='regression head, decoded distributional head, or their average')
+    ap.add_argument('--output', choices=['reg', 'dist', 'blend', 'pair'], default='reg',
+                    help='regression head, decoded marginal distribution, their average, or decoded joint pair')
     args = ap.parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     models = [load(r, args.weights, device, args.quant) for r in args.runs]
@@ -76,6 +77,25 @@ if __name__ == '__main__':
         reg, _, top = m(x, None, return_top=True)
         if args.output == 'reg':
             return reg
+        if args.output == 'pair':
+            if m.pair_heads is None:
+                raise ValueError('--output pair requires a run trained with --pair-weight')
+            cls = m.class_head(top[:, :99]).mean(1).argmax(-1)
+            pair_atoms = make_class_atoms()
+            out = torch.zeros_like(reg)
+            for ci, support in enumerate(pair_atoms):
+                ix = torch.where(cls == ci)[0]
+                if not ix.numel():
+                    continue
+                n = len(support)
+                logits = m.pair_heads[ci](top[ix])
+                joint = torch.softmax(logits, -1).view(len(ix), top.shape[1], n, n)
+                av = torch.as_tensor(support, device=x.device, dtype=joint.dtype)
+                p0, p1 = joint.sum(-1), joint.sum(-2)
+                aw = av.abs()
+                out[ix, :, 0] = (p0 * (aw * av)).sum(-1) / (p0 * aw).sum(-1).clamp_min(1e-8)
+                out[ix, :, 1] = (p1 * (aw * av)).sum(-1) / (p1 * aw).sum(-1).clamp_min(1e-8)
+            return out
         dist = decode_dist(m.dist_head(top).unflatten(-1, (2, len(atoms))), atoms)
         return dist if args.output == 'dist' else (reg + dist) / 2
 
