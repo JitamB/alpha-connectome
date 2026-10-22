@@ -33,6 +33,7 @@ Runtime: M2 us/row from `src/check_submission.py`; projected scorer minutes = us
 | online per-sequence calibration / class-3 regime features | closed: seq-mean y does not persist (half-vs-half corr ≈ 0) | 10-22 forensics_a1 | — |
 | reconstructed-mask training weights (B3) | closed: mask AUC 0.889 even with next-row features (gate 0.93) | 10-22 forensics_a1 | — |
 | regularisation: dropout 0.1, weight decay 1e-3 | dropout −0.0009 V1 (2 seeds), wd flat | 10-22 round 2 | — |
+| activity/range aux head (future excursions, price-change counts, mean abs y) | V1 −0.0002 main effect (2×2, 2 seeds) | 10-22 round 2 | — |
 
 | date | name | model | V1 | V2 | V3 | M2 us/row (proj. min) | LB | notes |
 |---|---|---|---|---|---|---|---|---|
@@ -672,3 +673,14 @@ Next: tools/shape_gate.py (job theconqueror01/wunder-r2-shape-gate) stacks per-s
 | lr7e4_wd1e3_full | weight decay 1e-4 → 1e-3 (seed 0) | 0.6818 | 0.5093 | 0.4466 | +0.0000 / +0.0003 / −0.0003 → flat |
 
 The memorisation gap is real (+0.005 on seen valid), but dropout and weight decay do not turn it into generalisation. Regularisation is closed.
+
+**2×2 screen complete** (job theconqueror01/wunder-r2-act-s0 for the seed-0 cells). Base = lr7e4_full / _seed1; `tools/judge.py --cells`:
+
+| effect (2 seeds) | V1 | V2 | V3 | class 3 V1 | verdict |
+|---|---|---|---|---|---|
+| activity/range head `--act-weight 0.2` (main effect) | −0.0002 (SE 0.0004) | −0.0006 | +0.0001 | −0.0004 | REJECT (flat) |
+| dropout 0.1 (main effect) | −0.0007 (z −2.1) | −0.0008 | −0.0008 | −0.0014 | REJECT (hurts) |
+| interaction | +0.0002 | −0.0002 | −0.0003 | +0.0001 | — |
+| both vs base | −0.0010 | −0.0014 | −0.0007 | −0.0018 | REJECT |
+
+The activity head by itself (paired) gives V1 −0.0004 / V2 −0.0004 / V3 +0.0004. Supervising future volatility and excursions adds nothing, even though the state decodes future volatility at only 0.25. Aux-target supervision is saturated, and **Track B is closed.**
