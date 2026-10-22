@@ -698,3 +698,6 @@ Method:
 | in-sample on holdout (all rows) | 0.4502 → 0.4508 | +0.0006 (in-sample only) |
 
 The shape-determined cost part S is already captured by the GRU pair's predictions; the old "corr(p0+p1, S) = 0.03 on class-3 scored rows" did not mean the information was missing. **The shape-lookup line is closed.** It is not packaged: the train+valid coefficients (results/corr_tv_lr7e4.npz) are kept but not shipped.
+
+### 2026-10-22: LB of the K=1 fallback gru_all_tv_lr7e4_s1
+**LB 0.65539** (26m37s, 680 MB). Predicted from the clean twin: 0.93 × 0.6822 + 0.0195 + ~0.002 (train+valid refit) ≈ 0.6559, so it lands within ~0.0005. The K=2 pair ens2_all_tv_lr7e4 adds +0.0012 LB over this single model. As a runtime hedge, the K=1 pick fits a final set up to ~2.2× the public test size; K=2 (~44 min) fits up to ~1.3×.
