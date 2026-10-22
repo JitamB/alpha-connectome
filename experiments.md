@@ -582,3 +582,13 @@ lr7e4_full_seed1) and lr7e4_e5_full (vs e4).
 4 epochs: all-rows views (V2, V3) up in both seeds, the masked V1 flat; 5 epochs past the peak. Not a V1 win, but V3
 is the only clean view for train + valid models and moves +0.002 in both seeds -> one 4-epoch final pair as a
 candidate (job wunder-tv-e4: gru_all_tv_lr7e4_e4 / _seed1 + eval of the train-only e4 pair vs pair_lr7e4).
+
+### 2026-10-22: 4-epoch final pair (job wunder-tv-e4)
+| name | V1 | V2 | V3 | paired delta |
+|---|---|---|---|---|
+| pair_lr7e4_e4 (train-only 4-epoch pair) | 0.6836 | 0.5134 | 0.4527 | vs pair_lr7e4: +0.0003 / **+0.0019 (z 5.7)** / **+0.0025 (z 3.6)** |
+| gru_all_tv_lr7e4_e4 / _seed1 (train + all valid) | (0.6897 seen) | (0.5245 / 0.5252 seen) | 0.4504 / 0.4504 | V3 vs 3-epoch tv twins +0.0022 / +0.0008 |
+Packaged submissions/ens2_all_tv_lr7e4_e4 (same shapes -> ~44 min); checks: job wunder-check-e4. V1 is flat at pair level,
+all-rows views clearly up -> expected LB +0.0000 to +0.0010 over 0.65655.
+Seen-vs-unseen check from saved moments: gru_all_tvA vs gru_all_full on valid half A (seen) +0.0052 / half B (unseen)
++0.0007; seed 1 +0.0061 / +0.0004 (class 3: +0.009 / +0.015 seen) -> a real memorisation gap; regularisation untested.
