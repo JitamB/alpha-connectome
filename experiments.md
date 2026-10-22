@@ -556,3 +556,14 @@ and job wunder-opt (batch 32 and 4 epochs at 7e-4, paired vs lr7e4_full).
 The single-model gain (+0.0010 V1) shrinks to ~+0.0005 after 2-model averaging (part of what lr 7e-4 fixes is
 seed-level variance that averaging already removes). Packaged submissions/ens2_all_tv_lr7e4 (same shapes as
 ens2_all_tv); expected LB ~ +0.0004 over 0.6562 -- inside scorer noise, optional upload. Checks: job wunder-check-lr7e4.
+Checks (Kaggle CPU, job wunder-check-lr7e4): all correctness checks PASS, numba = torch to 1.8e-6 (runtime projection
+not meaningful there; same shapes as ens2_all_tv -> ~44 min). submissions/ens2_all_tv_lr7e4.zip is ready.
+
+### 2026-10-22: optimisation at lr 7e-4 (job wunder-opt, seed 0, paired vs lr7e4_full)
+| name | change | V1 | V2 | V3 | paired delta (V1 / V2 / V3) |
+|---|---|---|---|---|---|
+| lr7e4_b32_full | batch 32 (half the optimiser steps) | 0.6806 | 0.5071 | 0.4458 | **-0.0012 / -0.0018 / -0.0011** |
+| lr7e4_e4_full | 4 epochs | 0.6825 | 0.5110 | 0.4490 | **+0.0008 / +0.0020 (z 4.9) / +0.0021 (z 2.7)** |
+More optimiser steps help, fewer hurt -- at the lower lr the recipe is under-trained (monitor 0.4478 at epoch 3 and 4;
+at lr 1e-3 / old recipe 5 epochs gave nothing). Next (job wunder-epochs): lr7e4_e4_full_seed1 (replicate vs
+lr7e4_full_seed1) and lr7e4_e5_full (vs e4).
