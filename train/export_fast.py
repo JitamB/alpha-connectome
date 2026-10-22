@@ -27,6 +27,8 @@ if __name__ == '__main__':
     ap.add_argument('--weights', default='best.pt')
     ap.add_argument('--bf16', action='store_true', help='store the large matrices as bfloat16 (half the weight bytes)')
     ap.add_argument('--alpha', type=float, default=0.0, help='share of the decoded distributional head in the output')
+    ap.add_argument('--table', help='exact-shape table (tools/build_shape_table.py), with --correction')
+    ap.add_argument('--correction', help='per-class correction coefficients (tools/fit_shape_correction.py)')
     args = ap.parse_args()
     sds = []
     for run in args.runs:
@@ -42,8 +44,16 @@ if __name__ == '__main__':
         sds.append(sd)
     out = ROOT / 'submissions' / args.name
     out.mkdir(parents=True, exist_ok=True)
-    np.savez(out / 'weights.npz', **pack(sds, make_atoms(), args.alpha, args.bf16))
+    packed = pack(sds, make_atoms(), args.alpha, args.bf16)
+    assert bool(args.table) == bool(args.correction), '--table and --correction go together'
+    if args.table:
+        with np.load(args.table) as tb, np.load(args.correction) as cr:
+            packed.update({'shape_keys': tb['keys'], 'shape_stats': tb['stats'], 'shape_cls': tb['cls'],
+                           'shape_prior': tb['prior'], 'corr_mu': cr['mu'], 'corr_sd': cr['sd'], 'corr_W': cr['W']})
+    np.savez(out / 'weights.npz', **packed)
     shutil.copy(ROOT / 'src' / 'fast_gru.py', out / 'fast_gru.py')
+    shutil.copy(ROOT / 'src' / 'shape_lookup.py', out / 'shape_lookup.py')
     shutil.copy(ROOT / 'templates' / 'solution_fast.py', out / 'solution.py')
-    (out / 'MODELS.txt').write_text('\n'.join(f'{r}/{args.weights}' for r in args.runs) + '\n')
+    (out / 'MODELS.txt').write_text('\n'.join(f'{r}/{args.weights}' for r in args.runs) + '\n' +
+                                    (f'table {args.table}\ncorrection {args.correction}\n' if args.table else ''))
     print(f'exported average of {len(sds)} model(s) -> {out}')

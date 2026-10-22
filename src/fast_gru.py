@@ -9,6 +9,8 @@ pack(..., bf16=True) stores the five large matrices (projection, GRU input / hid
 import numpy as np
 from numba import njit
 
+from shape_lookup import MULT as SHAPE_MULT, N_FEAT as SHAPE_N, lookup as shape_lookup_row, shape_hash
+
 EMA_SPANS = (10, 100, 1000)
 VOL_SPAN = 100
 BF16_NAMES = ('Wp', 'Wih0', 'Whh0', 'Wih1', 'Whh1')
@@ -158,8 +160,33 @@ def step(mv, x, first, prev, ema, vol, alphas, vol_alpha, f,
     out[1] /= K
 
 
+@njit(fastmath=True)
+def shape_correct(x, out, keys, stats, cls, prior, mu, sd, W, counts, feat, z):
+    """Optional exact-shape correction of the averaged prediction out (2,) for row x (112,): look up the i0 shape
+    (src/shape_lookup.py), add a vote for its asset class (counts (4,), reset per sequence), then replace out by the
+    per-class ridge on [out0, out1, lookup features] (tools/fit_shape_correction.py). No hit yet -> out unchanged."""
+    i = shape_lookup_row(shape_hash(x, SHAPE_MULT), keys, stats, cls, prior, feat)
+    if i >= 0:
+        counts[cls[i]] += 1.0
+    if counts.max() <= 0.0:
+        return
+    c = np.argmax(counts)
+    z[0] = out[0]
+    z[1] = out[1]
+    for k in range(feat.shape[0]):
+        z[2 + k] = feat[k]
+    n = z.shape[0]
+    for t in range(2):
+        acc = W[c, n, t]
+        for k in range(n):
+            acc += (z[k] - mu[c, k]) / sd[c, k] * W[c, k, t]
+        out[t] = acc
+
+
 class FastEnsemble:
-    """Row-by-row runner around step(); call reset() at the start of every sequence."""
+    """Row-by-row runner around step(); call reset() at the start of every sequence.
+    If the weights carry an exact-shape table and correction (export_fast --table/--correction), shape_correct() is
+    applied to every row's output."""
 
     def __init__(self, weights):
         self.w = [weights[k] for k in WEIGHT_NAMES]
@@ -181,14 +208,25 @@ class FastEnsemble:
         self.buf = np.zeros(max(self.f.shape[0], P, H), dtype=np.uint32)
         self.mv = _matvec_bf16 if weights['Wp'].dtype == np.uint16 else _matvec
         self.first = True
+        self.corr = None
+        if 'shape_keys' in weights:
+            self.corr = tuple(weights[k] for k in ('shape_keys', 'shape_stats', 'shape_cls', 'shape_prior',
+                                                   'corr_mu', 'corr_sd', 'corr_W'))
+            self.counts = np.zeros(4)
+            self.feat = np.zeros(SHAPE_N)
+            self.zc = np.zeros(2 + SHAPE_N)
 
     def reset(self):
         self.h0[:] = 0.0
         self.h1[:] = 0.0
         self.first = True
+        if self.corr is not None:
+            self.counts[:] = 0.0
 
     def update(self, x):
         step(self.mv, x, self.first, self.prev, self.ema, self.vol, self.alphas, self.vol_alpha, self.f, *self.w,
              self.h0, self.h1, self.z, self.gi, self.gh, self.dl, self.buf, self.out)
+        if self.corr is not None:
+            shape_correct(x, self.out, *self.corr, self.counts, self.feat, self.zc)
         self.first = False
         return self.out
