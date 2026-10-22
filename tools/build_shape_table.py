@@ -65,6 +65,7 @@ def main():
     info = {'rows': float(tot[0]), 'shapes': int(len(uk)), 'kept': int(keep.sum()),
             'row_coverage_of_kept': float(agg[keep, 0].sum() / tot[0]), 'mixed_class_shapes': int(((cls_cnt > 0).sum(1) > 1).sum()),
             'per_class_shapes': [int(((cls_cnt.argmax(1) == c) & keep).sum()) for c in range(4)]}
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(args.out, keys=uk[keep], stats=agg[keep].astype(np.float32), cls=major[keep].astype(np.uint8),
                         prior=prior, info=json.dumps(info))
     out = Path(args.out)
