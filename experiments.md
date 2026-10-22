@@ -34,7 +34,7 @@ Runtime: M2 us/row from `src/check_submission.py`; projected scorer minutes = us
 | reconstructed-mask training weights (B3) | closed: mask AUC 0.889 even with next-row features (gate 0.93) | 10-22 forensics_a1 | — |
 | regularisation: dropout 0.1, weight decay 1e-3 | dropout −0.0009 V1 (2 seeds), wd flat | 10-22 round 2 | — |
 | activity/range aux head (future excursions, price-change counts, mean abs y) | V1 −0.0002 main effect (2×2, 2 seeds) | 10-22 round 2 | — |
-| exact-shape lookup (S/D per exact i0 shape), post-hoc per-class ridge | V1 +0.00004 (G1), +0.0001 / +0.00004 (G2) | 10-22 corr | the GRU already has it |
+| exact-shape lookup (S/D per exact i0 shape): post-hoc ridge, stacking gate, HistGB | V1 +0.00004 / +0.00001 (G1), HistGB worse | 10-22 corr, shape_gate | the GRU already has it |
 
 | date | name | model | V1 | V2 | V3 | M2 us/row (proj. min) | LB | notes |
 |---|---|---|---|---|---|---|---|---|
@@ -701,3 +701,31 @@ The shape-determined cost part S is already captured by the GRU pair's predictio
 
 ### 2026-10-22: LB of the K=1 fallback gru_all_tv_lr7e4_s1
 **LB 0.65539** (26m37s, 680 MB). Predicted from the clean twin: 0.93 × 0.6822 + 0.0195 + ~0.002 (train+valid refit) ≈ 0.6559, so it lands within ~0.0005. The K=2 pair ens2_all_tv_lr7e4 adds +0.0012 LB over this single model. As a runtime hedge, the K=1 pick fits a final set up to ~2.2× the public test size; K=2 (~44 min) fits up to ~1.3×.
+Independent confirmation (job theconqueror01/wunder-r2-shape-gate, tables from 3000 seqs, tools/shape_gate.py):
+
+| protocol | V1 | V2 |
+|---|---|---|
+| G1 holdout → valid | +0.00001 | +0.00003 |
+| G2 A→B | +0.00007 | −0.00018 |
+| G2 B→A | −0.00001 | −0.00007 |
+| HistGB (pred + shape + class) | 0.6805, below pred 0.6833 | |
+
+On class-3 *scored* valid rows, the modal-S lookup is right only 77% of the time (92% on all segments). corr(lookup E[S], S) = 0.22 and corr(pred sum, S) = 0.085. Scored rows avoid transitions, and there S is less shape-determined. **Track A is closed.**
+
+### 2026-10-22: round-2 outcome
+None of the round-2 levers moved V1 beyond noise:
+- the best-exit target and the anchored clock (rejected);
+- online / regime calibration (no persistence);
+- reconstructed-mask weights (AUC 0.889);
+- exact-shape lookup (+0.00004);
+- dropout (−0.0009);
+- weight decay (flat);
+- the activity/range head (−0.0002).
+
+What carries forward:
+- **bit-identical reproducibility** across accounts and days (prize verification);
+- a **scored K=1 runtime fallback** (LB 0.65539, 26m37s);
+- the experiment workflow (skill, judge.py, CANDIDATES.md, closed lines);
+- the second Kaggle account.
+
+ens2_all_tv_lr7e4 (LB 0.65655) stays primary.
