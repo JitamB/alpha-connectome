@@ -13,7 +13,7 @@ mkdir -p $B/data $B/kernel
 # provenance.json: the commit the job's code came from (train_gru.py copies it into config.json)
 printf '{"commit": "%s", "dirty_files": %s, "pushed_utc": "%s", "account": "%s", "job": "%s"}\n' "$(git rev-parse HEAD)" \
     "$(git status --porcelain -- src train models tools kaggle | wc -l | tr -d ' ')" "$(date -u +%FT%TZ)" "$USER" "$SLUG" > $B/provenance.json
-COPYFILE_DISABLE=1 tar czf $B/data/code.tgz src/data.py src/evaluate.py src/features.py train/train_gru.py train/gpu_features.py \
+COPYFILE_DISABLE=1 tar czf $B/data/code.tgz src/data.py src/evaluate.py src/features.py src/shape_lookup.py train/train_gru.py train/gpu_features.py \
     train/eval_torch.py tools/fetch_data.py splits/holdout.json splits/train_classes.json wnn_connectome_starterpack/utils.py \
     models/mask_model.py models/mask_mlp.pt tools/probe_hidden.py splits/valid_classes.json ${EXTRA:-} \
     -C $B provenance.json   # EXTRA: more files, e.g. checkpoints for eval-only jobs

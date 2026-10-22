@@ -60,3 +60,9 @@ def features(X, keys, stats, cls, prior):
     f = np.column_stack([hit.astype(np.float64), np.log1p(cnt)] +
                         [(st[:, k + 1] + SHRINK * pr[:, k]) / den for k in range(6)])
     return f.astype(np.float32), np.where(hit, pos, -1)
+
+
+def load_table(path):
+    """-> (keys, stats, cls, prior) as stored by tools/build_shape_table.py."""
+    with np.load(path) as z:
+        return z['keys'], z['stats'], z['cls'], z['prior']

@@ -27,6 +27,7 @@ from evaluate import seq_moments, wp_from_moments  # noqa: E402
 from features import N_FEATURES, batch_features  # noqa: E402
 from gpu_features import torch_features  # noqa: E402
 from mask_model import mask_prob  # noqa: E402
+from shape_lookup import N_FEAT as SHAPE_N, features as shape_features, load_table  # noqa: E402
 
 TRANSFORMS = {'raw': (112, None), 'eng': (N_FEATURES, batch_features)}
 BLOCKS = ('raw', 'diff', 'ema10', 'ema100', 'ema1000', 'vol')  # 112-column blocks of the engineered features, in order
@@ -243,15 +244,18 @@ def read_batch(path, groups):
     return list(iter_sequences(path, tr)) + list(iter_sequences(VALID, va))
 
 
-def prefetch(groups_batches, transform=None, path=TRAIN, depth=1):
+def prefetch(groups_batches, transform=None, path=TRAIN, depth=1, table=None):
     """Background thread that reads batches of sequences -> (X (B,T,F), Y (B,T,2), M (B,T)) numpy arrays;
-    M = official is_scored mask (0/1) for valid sequences, -1 for train sequences (no mask)."""
+    M = official is_scored mask (0/1) for valid sequences, -1 for train sequences (no mask).
+    table (--shape-table): the exact-shape lookup features are appended as the last SHAPE_N columns of X."""
     q = queue.Queue(depth)
 
     def work():
         for groups in groups_batches:
             seqs = read_batch(path, groups)
             X = np.stack([s.X if transform is None else transform(s.X) for s in seqs])
+            if table is not None:
+                X = np.concatenate([X, np.stack([shape_features(s.X, *table)[0] for s in seqs])], -1)
             M = np.stack([s.scored.astype(np.float32) if s.scored is not None else np.full(len(s.y), -1, np.float32)
                           for s in seqs])
             q.put((X, np.stack([s.y for s in seqs]), M))
@@ -262,15 +266,20 @@ def prefetch(groups_batches, transform=None, path=TRAIN, depth=1):
         yield item
 
 
+def engineer(X):
+    """GPU engineered features of raw rows (B, T, 112), keeping columns appended by prefetch (shape lookup) at the end."""
+    return torch_features(X) if X.shape[-1] == 112 else torch.cat([torch_features(X[..., :112]), X[..., 112:]], -1)
+
+
 @torch.no_grad()
-def monitor_score(model, groups, device, transform, gpu_features=False, batch=16, future=()):
+def monitor_score(model, groups, device, transform, gpu_features=False, batch=16, future=(), table=None):
     """WP on all need_prediction rows of a train-holdout slice (model selection; valid stays untouched)."""
     model.eval()
     moments = []
     batches = [groups[i:i + batch] for i in range(0, len(groups), batch)]
-    for X, Y, _ in prefetch(batches, None if gpu_features else transform):
+    for X, Y, _ in prefetch(batches, None if gpu_features else transform, table=table):
         X = torch.from_numpy(X).to(device)
-        F = torch_features(X) if gpu_features else X
+        F = engineer(X) if gpu_features else X
         if future:
             F = torch.cat([F, future_features(X, future)], -1)
         pred, _ = model(F, None)
@@ -344,11 +353,14 @@ def main():
     ap.add_argument('--act-weight', type=float, default=0.0,
                     help='weight of the training-only activity/range head (future i0 excursions, price changes, mean |y|)')
     ap.add_argument('--act-horizons', type=int, nargs='+', default=[100, 300])
+    ap.add_argument('--shape-table', help='exact-shape lookup table (tools/build_shape_table.py): append its features as inputs')
     args = ap.parse_args()
     if args.gpu_features is None:
         args.gpu_features = args.device.startswith('cuda') and args.features == 'eng'
     assert args.mask_model is None or (args.loss == 'wmse' and args.features == 'eng'), 'mask weights need wmse + eng'
     assert not (args.future_inputs or args.teacher) or args.gpu_features, 'teacher paths need --gpu-features'
+    assert not (args.shape_table and (args.future_inputs or args.teacher or args.conv)), 'shape table: plain recipe only'
+    table = load_table(args.shape_table) if args.shape_table else None
 
     args.out.mkdir(parents=True, exist_ok=True)
     torch.manual_seed(args.seed)
@@ -377,13 +389,15 @@ def main():
     n_in, transform = TRANSFORMS[args.features]
     atoms = torch.tensor(make_atoms())
     conv = (args.conv[0], args.conv[1], args.conv[2:]) if args.conv else None
-    model = GRUModel(n_in + 112 * len(args.future_inputs), args.hidden, args.layers, args.skip, args.proj,
+    model = GRUModel(n_in + SHAPE_N * (table is not None) + 112 * len(args.future_inputs), args.hidden, args.layers, args.skip, args.proj,
                      len(atoms) if args.dist_weight else 0, conv, args.cell, args.drop_blocks, args.dropout)
     train_only = [g for g in groups if g < VALID_OFFSET] or train_groups()
     stats_groups = sorted(np.random.default_rng(args.seed + 1).choice(train_only, min(64, len(train_only)), replace=False).tolist())
 
     def stats_rows(x):
         f = x if transform is None else transform(x)
+        if table is not None:
+            f = np.hstack([f, shape_features(x, *table)[0]])
         if args.future_inputs:
             f = np.hstack([f, future_features(torch.from_numpy(x)[None], args.future_inputs)[0].numpy()])
         return f[WARMUP::10]
@@ -444,7 +458,7 @@ def main():
         order = np.random.default_rng(args.seed + epoch).permutation(groups)
         batches = [sorted(order[i:i + args.batch].tolist()) for i in range(0, len(order), args.batch)]
         t0, losses, aux_losses, lag_losses, dist_losses, teach_losses, act_losses = time.time(), [], [], [], [], [], []
-        for b, (X, Y, M) in enumerate(prefetch(batches, None if args.gpu_features else transform)):
+        for b, (X, Y, M) in enumerate(prefetch(batches, None if args.gpu_features else transform, table=table)):
             X, Y = torch.from_numpy(X).to(device), torch.from_numpy(Y).to(device)
             if aux_head is not None:
                 A, V = aux_targets(X[..., :112], args.aux_horizons)  # raw block comes first in both layouts
@@ -458,7 +472,7 @@ def main():
                 AT = AT / act_std
             Xraw = X
             if args.gpu_features:
-                X = torch_features(X)
+                X = engineer(X)
             if teachers is not None:  # per sequence: the teacher that did not see it (see --teacher)
                 order = [g for g in batches[b] if g < VALID_OFFSET] + [g for g in batches[b] if g >= VALID_OFFSET]
                 pick = [0 if g >= VALID_OFFSET else 1 - g % 2 for g in order]
@@ -554,7 +568,7 @@ def main():
                            (f' act {np.mean(act_losses[-200:]):.4f}' if act_losses else '')
                 print(f'epoch {epoch} batch {b + 1}/{len(batches)} loss {np.mean(losses[-200:]):.4f}{aux_note} '
                       f'lr {sched.get_last_lr()[0]:.2e} {rate / 1e3:.0f}k rows/s', flush=True)
-        score = monitor_score(model, monitor, device, transform, args.gpu_features, future=args.future_inputs)
+        score = monitor_score(model, monitor, device, transform, args.gpu_features, future=args.future_inputs, table=table)
         history.append({'epoch': epoch, 'loss': float(np.mean(losses)), 'monitor_wp': score, 'minutes': (time.time() - t0) / 60})
         print(f'== epoch {epoch}: monitor WP (holdout, all rows) {score:.5f}', flush=True)
         if score > best:
