@@ -32,6 +32,7 @@ Runtime: M2 us/row from `src/check_submission.py`; projected scorer minutes = us
 | best-exit target (H3) + anchored-window clock (B) | rejected: S falls with activity, floor broken, no length threshold | 10-22 forensics_a1 | — |
 | online per-sequence calibration / class-3 regime features | closed: seq-mean y does not persist (half-vs-half corr ≈ 0) | 10-22 forensics_a1 | — |
 | reconstructed-mask training weights (B3) | closed: mask AUC 0.889 even with next-row features (gate 0.93) | 10-22 forensics_a1 | — |
+| regularisation: dropout 0.1, weight decay 1e-3 | dropout −0.0009 V1 (2 seeds), wd flat | 10-22 round 2 | — |
 
 | date | name | model | V1 | V2 | V3 | M2 us/row (proj. min) | LB | notes |
 |---|---|---|---|---|---|---|---|---|
@@ -661,3 +662,13 @@ Other results:
 - **Raw examples (class 3).** Shapes cluster into best-price states that share labels. In one sequence, n1 flips 39 ↔ −1 between consecutive transitions, so the label depends on the current quote state in a jumpy way. The exact definition is not found and the realized-label line is parked.
 
 Next: tools/shape_gate.py (job theconqueror01/wunder-r2-shape-gate) stacks per-shape S/D lookup features on the train-only pair. Pass mark: +0.002 V1 in G1 and both G2 directions, against the ridge-on-predictions baseline.
+
+### 2026-10-22: round-2 training levers (jobs theconqueror01/wunder-r2-repro-drop; jitamb/wunder-r2-s1a, -s1b)
+**Reproducibility.** repro_lr7e4_full is lr7e4_full re-trained with the new code (all new flags off) on the second account. Its best.pt sha256 is **identical** (d2e62450…) and the monitor curve is identical (0.415582 / 0.437756 / 0.443733). So the default path is unchanged and training reproduces exactly across accounts and days. That covers the prize-verification reproducibility check. Provenance is now recorded in config.json (commit 4f199a3, torch 2.11.0+cu128, cuDNN 91900, T4).
+
+| name | change | V1 | V2 | V3 | same-seed paired delta (V1 / V2 / V3), tools/judge.py |
+|---|---|---|---|---|---|
+| lr7e4_drop10_full / _seed1 | dropout 0.1 on both GRU inputs | 0.6811 / 0.6811 | 0.5082 / 0.5080 | 0.4463 / 0.4477 | **−0.0009 (z −2.1) / −0.0007 / −0.0006**, class 3 −0.0015 → **REJECT** |
+| lr7e4_wd1e3_full | weight decay 1e-4 → 1e-3 (seed 0) | 0.6818 | 0.5093 | 0.4466 | +0.0000 / +0.0003 / −0.0003 → flat |
+
+The memorisation gap is real (+0.005 on seen valid), but dropout and weight decay do not turn it into generalisation. Regularisation is closed.
