@@ -534,3 +534,15 @@ The lr has never been tuned: 2e-3 costs 0.007, so the optimum may be below 1e-3 
 | lr7e4_full | 0.6818 | 0.5089 | 0.4468 | +0.0008 (z 1.9) / +0.0005 / +0.0002 |
 The lr curve is flat below 1e-3 and steep above (2e-3: -0.0066). 7e-4 is marginally best but within ~1.3 run sd;
 replicates running (job wunder-lr2: lr7e4_full_seed1 / _seed2 vs gru_all_full_seed1 / _seed2).
+
+### 2026-10-22: lr 7e-4 replicates (job wunder-lr2)
+| pair (lr 7e-4 vs 1e-3, same seed) | V1 | V2 | V3 |
+|---|---|---|---|
+| seed 0 | +0.0008 (z 1.9) | +0.0005 | +0.0002 |
+| seed 1 | +0.0007 (z 2.2) | +0.0005 | -0.0000 |
+| seed 2 | **+0.0014 (z 3.4)** | **+0.0027 (z 6.3)** | +0.0010 |
+| mean | **+0.0010** | **+0.0012** | +0.0004 |
+lr 7e-4 singles: V1 0.6818 / 0.6822 / 0.6822 (mean 0.6821, vs 0.6811 at 1e-3). Consistent sign in 3/3 seeds on every view,
+zero inference cost -> **adopted** (just under the +0.0012 V1 bar on the mean, but no run went the other way).
+Next: job wunder-tv-lr7e4 (final pair on train + all valid at 7e-4 + eval of the train-only 7e-4 pair vs ens2_all_full)
+and job wunder-opt (batch 32 and 4 epochs at 7e-4, paired vs lr7e4_full).
