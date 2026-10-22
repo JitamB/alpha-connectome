@@ -74,8 +74,10 @@ class GRUModel(nn.Module):
     R = (kernel - 1) * sum(dilations) raw rows, carried as the last element of the hidden list (zeros at
     sequence start), so chunked training equals row-by-row streaming."""
 
-    def __init__(self, n_in=112, hidden=128, layers=2, skip=False, proj=0, atoms=0, conv=None, cell='gru', drop=()):
+    def __init__(self, n_in=112, hidden=128, layers=2, skip=False, proj=0, atoms=0, conv=None, cell='gru', drop=(),
+                 dropout=0.0):
         super().__init__()
+        self.p_drop = dropout  # training-only dropout on the input of every recurrent layer (no parameters)
         self.register_buffer('mean', torch.zeros(n_in))
         self.register_buffer('std', torch.ones(n_in))
         # optional: engineered blocks zeroed after standardisation (export zeroes their weights)
@@ -115,6 +117,8 @@ class GRUModel(nn.Module):
                 c = torch.relu(conv(c))
             z = torch.cat([z, c.transpose(1, 2)], -1)
         for i, block in enumerate(self.blocks):
+            if self.p_drop and self.training:
+                z = nn.functional.dropout(z, self.p_drop, True)
             z, h = block(z, None if hidden is None else hidden[i])
             new.append(h)
         if self.conv is not None:
@@ -166,6 +170,40 @@ def aux_targets(X, horizons):
         v[:T - h] = 1.0
         valid.append(v)
     return torch.cat(out, -1).float(), torch.cat(valid, -1)
+
+
+ACT_PER_H = 22 + 22 + 1 + 2  # up / down excursion per i0 price column, log1p(i0 price changes), mean |y| per target
+
+
+@torch.no_grad()
+def act_targets(X, Y, horizons):
+    """Training-only activity/range targets over the future window (t, t+h] (raw X (B, T, 112), targets Y (B, T, 2)):
+    per i0 price column max(x[t+1..t+h]) - x[t] and x[t] - min(x[t+1..t+h]), log1p(number of rows in the window where
+    an i0 price column changes), and the window mean of |clipped y| per target.
+    Returns (B, T, ACT_PER_H * len(horizons)) and a (T, same) 0/1 mask of positions where the window fits."""
+    x = X[..., :22].float()
+    B, T, C = x.shape
+    xs = x.transpose(1, 2).reshape(B * C, 1, T)
+    tr = torch.zeros(B, T, device=X.device, dtype=torch.float64)
+    tr[:, 1:] = (x[:, 1:] != x[:, :-1]).any(-1).double()
+    cs_tr = torch.cat([torch.zeros_like(tr[:, :1]), tr.cumsum(1)], 1)          # cs[k] = sum over s < k
+    ay = Y.clamp(-CLIP, CLIP).abs().double()
+    cs_y = torch.cat([torch.zeros_like(ay[:, :1]), ay.cumsum(1)], 1)
+    idx = torch.arange(T, device=X.device)
+    out, valid = [], []
+    for h in horizons:
+        ok = (idx <= T - 1 - h)[None, :, None]
+        hi = torch.cat([xs[..., 1:], xs.new_full((B * C, 1, h), float('-inf'))], -1)   # x[t+1..], padded at the end
+        lo = torch.cat([xs[..., 1:], xs.new_full((B * C, 1, h), float('inf'))], -1)
+        mx = nn.functional.max_pool1d(hi, h, 1).reshape(B, C, T).transpose(1, 2)
+        mn = -nn.functional.max_pool1d(-lo, h, 1).reshape(B, C, T).transpose(1, 2)
+        a, b = (idx + 1).clamp(max=T), (idx + h + 1).clamp(max=T)
+        n_tr = (cs_tr[:, b] - cs_tr[:, a]).float()[..., None]
+        m_y = ((cs_y[:, b] - cs_y[:, a]) / h).float()
+        blk = torch.cat([mx - x, x - mn, torch.log1p(n_tr), m_y], -1)
+        out.append(torch.where(ok, blk, torch.zeros_like(blk)))
+        valid.append(ok[0].float().expand(T, ACT_PER_H))
+    return torch.cat(out, -1), torch.cat(valid, -1)
 
 
 @torch.no_grad()
@@ -301,6 +339,11 @@ def main():
                     help='zero these engineered feature blocks (e.g. raw vol: sequence-level levels that shift between periods)')
     ap.add_argument('--valid-repeat', type=int, default=1, help='repeat the --valid-groups sequences this often per epoch')
     ap.add_argument('--no-train', action='store_true', help='no train.parquet sequences (fine-tune on --valid-groups only)')
+    ap.add_argument('--dropout', type=float, default=0.0, help='training-only dropout on the input of every recurrent layer')
+    ap.add_argument('--weight-decay', type=float, default=1e-4, help='AdamW weight decay')
+    ap.add_argument('--act-weight', type=float, default=0.0,
+                    help='weight of the training-only activity/range head (future i0 excursions, price changes, mean |y|)')
+    ap.add_argument('--act-horizons', type=int, nargs='+', default=[100, 300])
     args = ap.parse_args()
     if args.gpu_features is None:
         args.gpu_features = args.device.startswith('cuda') and args.features == 'eng'
@@ -335,7 +378,7 @@ def main():
     atoms = torch.tensor(make_atoms())
     conv = (args.conv[0], args.conv[1], args.conv[2:]) if args.conv else None
     model = GRUModel(n_in + 112 * len(args.future_inputs), args.hidden, args.layers, args.skip, args.proj,
-                     len(atoms) if args.dist_weight else 0, conv, args.cell, args.drop_blocks)
+                     len(atoms) if args.dist_weight else 0, conv, args.cell, args.drop_blocks, args.dropout)
     train_only = [g for g in groups if g < VALID_OFFSET] or train_groups()
     stats_groups = sorted(np.random.default_rng(args.seed + 1).choice(train_only, min(64, len(train_only)), replace=False).tolist())
 
@@ -355,6 +398,8 @@ def main():
     aux_std = None
     n_lag = len(args.lag_targets) + len(args.pmean_targets)
     lag_head = nn.Linear(args.hidden, 2 * n_lag).to(device) if args.lag_weight and n_lag else None
+    act_head = nn.Linear(args.hidden, ACT_PER_H * len(args.act_horizons)).to(device) if args.act_weight else None
+    act_std = None
     mw = {k: v.to(device) for k, v in torch.load(args.mask_model).items()} if args.mask_model else None
     teachers = [load_teacher(r, device) for r in args.teacher] if args.teacher else None
     for t, _ in teachers or []:
@@ -366,8 +411,8 @@ def main():
             aux_head.load_state_dict(ck['aux_head']); aux_std = ck['aux_std']
         if lag_head is not None and ck.get('lag_head') is not None:
             lag_head.load_state_dict(ck['lag_head'])
-    params = [p for m in (model, aux_head, lag_head) if m is not None for p in m.parameters()]
-    opt = torch.optim.AdamW(params, lr=args.lr, weight_decay=1e-4)
+    params = [p for m in (model, aux_head, lag_head, act_head) if m is not None for p in m.parameters()]
+    opt = torch.optim.AdamW(params, lr=args.lr, weight_decay=args.weight_decay)
     n_batches = (len(groups) + args.batch - 1) // args.batch
     steps_per_batch = (20_000 + args.chunk - 1) // args.chunk
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=args.lr, total_steps=args.epochs * n_batches * steps_per_batch,
@@ -385,13 +430,20 @@ def main():
             aux_head.load_state_dict(ck['aux_head']); aux_std = ck['aux_std']
         if lag_head is not None:
             lag_head.load_state_dict(ck['lag_head'])
+        if act_head is not None:
+            act_head.load_state_dict(ck['act_head']); act_std = ck['act_std']
         print(f'resumed after epoch {ck["epoch"]}')
-    (args.out / 'config.json').write_text(json.dumps({**vars(args), 'out': str(args.out), 'n_train': len(groups)}, indent=2))
+    prov_file = Path(__file__).resolve().parents[1] / 'provenance.json'  # written by kaggle/push.sh
+    prov = json.loads(prov_file.read_text()) if prov_file.exists() else {}
+    prov.update({'torch': torch.__version__, 'cuda': torch.version.cuda, 'cudnn': torch.backends.cudnn.version(),
+                 'device': torch.cuda.get_device_name(0) if device.type == 'cuda' else str(device)})
+    (args.out / 'config.json').write_text(json.dumps({**vars(args), 'out': str(args.out), 'n_train': len(groups),
+                                                      'provenance': prov}, indent=2))
 
     for epoch in range(start_epoch, args.epochs):
         order = np.random.default_rng(args.seed + epoch).permutation(groups)
         batches = [sorted(order[i:i + args.batch].tolist()) for i in range(0, len(order), args.batch)]
-        t0, losses, aux_losses, lag_losses, dist_losses, teach_losses = time.time(), [], [], [], [], []
+        t0, losses, aux_losses, lag_losses, dist_losses, teach_losses, act_losses = time.time(), [], [], [], [], [], []
         for b, (X, Y, M) in enumerate(prefetch(batches, None if args.gpu_features else transform)):
             X, Y = torch.from_numpy(X).to(device), torch.from_numpy(Y).to(device)
             if aux_head is not None:
@@ -399,6 +451,11 @@ def main():
                 if aux_std is None:
                     aux_std = ((A ** 2 * V).sum((0, 1)) / (V.sum(0) * len(A))).sqrt().clamp_min(1e-6)
                 A = A / aux_std
+            if act_head is not None:
+                AT, AV = act_targets(X[..., :112], Y, args.act_horizons)
+                if act_std is None:
+                    act_std = ((AT ** 2 * AV).sum((0, 1)) / (AV.sum(0) * len(AT))).sqrt().clamp_min(1e-6)
+                AT = AT / act_std
             Xraw = X
             if args.gpu_features:
                 X = torch_features(X)
@@ -473,6 +530,11 @@ def main():
                     lag = (wl * (lag_head(top[:, lo:]) - yl) ** 2).sum() / wl.sum().clamp_min(1e-8)
                     total = total + args.lag_weight * lag
                     lag_losses.append(lag.item())
+                if act_head is not None:
+                    v = AV[c:c + args.chunk]
+                    act = (((act_head(top) - AT[:, c:c + args.chunk]) ** 2) * v).sum() / (v.sum() * len(top)).clamp_min(1.0)
+                    total = total + args.act_weight * act
+                    act_losses.append(act.item())
                 opt.zero_grad(set_to_none=True)
                 total.backward()
                 nn.utils.clip_grad_norm_(params, 1.0)
@@ -488,7 +550,8 @@ def main():
                 aux_note = (f' aux {np.mean(aux_losses[-200:]):.4f}' if aux_losses else '') + \
                            (f' lag {np.mean(lag_losses[-200:]):.4f}' if lag_losses else '') + \
                            (f' ce {np.mean(dist_losses[-200:]):.4f}' if dist_losses else '') + \
-                           (f' teach {np.mean(teach_losses[-200:]):.4f}' if teach_losses else '')
+                           (f' teach {np.mean(teach_losses[-200:]):.4f}' if teach_losses else '') + \
+                           (f' act {np.mean(act_losses[-200:]):.4f}' if act_losses else '')
                 print(f'epoch {epoch} batch {b + 1}/{len(batches)} loss {np.mean(losses[-200:]):.4f}{aux_note} '
                       f'lr {sched.get_last_lr()[0]:.2e} {rate / 1e3:.0f}k rows/s', flush=True)
         score = monitor_score(model, monitor, device, transform, args.gpu_features, future=args.future_inputs)
@@ -502,7 +565,8 @@ def main():
         torch.save({'model': model.state_dict(), 'opt': opt.state_dict(), 'sched': sched.state_dict(),
                     'epoch': epoch, 'best': best, 'history': history, 'ema': ema,
                     'aux_head': aux_head.state_dict() if aux_head is not None else None, 'aux_std': aux_std,
-                    'lag_head': lag_head.state_dict() if lag_head is not None else None}, ckpt_path)
+                    'lag_head': lag_head.state_dict() if lag_head is not None else None,
+                    'act_head': act_head.state_dict() if act_head is not None else None, 'act_std': act_std}, ckpt_path)
         (args.out / 'history.json').write_text(json.dumps(history, indent=2))
 
 

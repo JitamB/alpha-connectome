@@ -4,14 +4,19 @@
 # jitamb/<JOB_SLUG> running kaggle/run_job.py with the given runs (one per GPU). GPU=false: CPU-only notebook (no GPU quota).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-K=~/.local/bin/kaggle; USER=jitamb; SLUG=$1; shift
+K=~/.local/bin/kaggle; USER=${KUSER:-jitamb}; SLUG=$1; shift
 # The CLI's stored OAuth login stops working for API calls after a while; a freshly printed token still works.
-export KAGGLE_API_TOKEN=$($K auth print-access-token 2>/dev/null | tail -1)
+# Second account: pass its token in KAGGLE_API_TOKEN and its user name in KUSER.
+export KAGGLE_API_TOKEN=${KAGGLE_API_TOKEN:-$($K auth print-access-token 2>/dev/null | tail -1)}
 B=$(mktemp -d)
 mkdir -p $B/data $B/kernel
+# provenance.json: the commit the job's code came from (train_gru.py copies it into config.json)
+printf '{"commit": "%s", "dirty_files": %s, "pushed_utc": "%s", "account": "%s", "job": "%s"}\n' "$(git rev-parse HEAD)" \
+    "$(git status --porcelain -- src train models tools kaggle | wc -l | tr -d ' ')" "$(date -u +%FT%TZ)" "$USER" "$SLUG" > $B/provenance.json
 COPYFILE_DISABLE=1 tar czf $B/data/code.tgz src/data.py src/evaluate.py src/features.py train/train_gru.py train/gpu_features.py \
     train/eval_torch.py tools/fetch_data.py splits/holdout.json splits/train_classes.json wnn_connectome_starterpack/utils.py \
-    models/mask_model.py models/mask_mlp.pt tools/probe_hidden.py splits/valid_classes.json ${EXTRA:-}   # EXTRA: more files, e.g. checkpoints for eval-only jobs
+    models/mask_model.py models/mask_mlp.pt tools/probe_hidden.py splits/valid_classes.json ${EXTRA:-} \
+    -C $B provenance.json   # EXTRA: more files, e.g. checkpoints for eval-only jobs
 cat > $B/data/dataset-metadata.json <<META
 {"title": "wunder-code", "id": "$USER/wunder-code", "licenses": [{"name": "other"}]}
 META
