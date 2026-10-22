@@ -29,6 +29,9 @@ Runtime: M2 us/row from `src/check_submission.py`; projected scorer minutes = us
 | reconstructed past targets (HistGB on 60 seqs) | +0.000 | 10-09 | exact target definition (realized labels) |
 | K=3 ensemble; bf16 / int8 kernels | timeout / slower / −0.0007 | 10-16, 10-18 | — |
 | causal-ensemble distillation | not run: teachers are in-sample, so it would distil memorisation | 10-22 review | cross-fitted teachers |
+| best-exit target (H3) + anchored-window clock (B) | rejected: S falls with activity, floor broken, no length threshold | 10-22 forensics_a1 | — |
+| online per-sequence calibration / class-3 regime features | closed: seq-mean y does not persist (half-vs-half corr ≈ 0) | 10-22 forensics_a1 | — |
+| reconstructed-mask training weights (B3) | closed: mask AUC 0.889 even with next-row features (gate 0.93) | 10-22 forensics_a1 | — |
 
 | date | name | model | V1 | V2 | V3 | M2 us/row (proj. min) | LB | notes |
 |---|---|---|---|---|---|---|---|---|
@@ -640,3 +643,21 @@ Pre-registered (running):
   - Gate G1: clear best-exit structure plus an identified clock → A2, the exact-definition search.
   - Mask gate: AUC ≥ 0.93 with next-row features → reconstructed-mask training weights.
 - **K=1 runtime fallback** gru_all_tv_lr7e4_s1 (check job jitamb/wunder-r2-check-k1).
+
+### 2026-10-22: A1 forensic probes (job theconqueror01/wunder-r2-forensics, tools/forensics.py; 60 train seqs per class + 240 valid)
+| probe | class 0 | class 1 | class 2 | class 3 | reading |
+|---|---|---|---|---|---|
+| segments / distinct i0 shapes per seq | 8584 / 1514 | 6108 / 306 | 2369 / 45 | 4067 / 11 | class 3 flickers among ~11 shapes; median segment = 1 row |
+| S = n0+n1: top values | −2, −3, −4, −1 … (P(S>0) 0.26) | −2, −1, −3 (0.18) | −1, −2 (0.08) | **−1 66%, −2 27%** (0.03) | cost-like only in coarse classes |
+| S purity given the exact shape: within seq / global (held-out seqs, coverage) | 0.67 / 0.61 (95%) | 0.66 / 0.65 (99.4%) | 0.76 / 0.75 (99.8%) | **0.92 / 0.92 (99.99%)** | **S is a lookup of the current exact shape in class 3** |
+| "no move" rate by segment length (clock-B test) | ~0.1, flat | → 0 | ~0.12, flat | 0.05 → 0.27, no jump | **no anchored-window threshold → clock B rejected** |
+| S vs next-300-row i0 activity | S falls with activity (+5.7 quiet → −0.56) | same | flat | flat | **opposite of best-exit (H3)**; n0 ≤ −3 on 10% of class-3 rows breaks its floor → **H3 rejected** |
+| label autocorr: event lag 20 vs row lag 100 | 0.55 / 0.52 | 0.37 / 0.34 | 0.29 / 0.57 | **0.08 / 0.44** | class 3 = shape-determined cost part + slow row-time part |
+| persistence of seq-mean y, 1st vs 2nd half (y0 / y1) | −0.09 / 0.17 | 0.28 / 0.18 | −0.04 / −0.06 | 0.09 / −0.01 | **no regime persistence → online per-sequence calibration closed** |
+
+Other results:
+- **a-features.** a6 ≈ time since the last i0 transition (Spearman 0.74; it only decreases at i0 transitions). a5 ≈ time since the last i0 trade (0.50). a7 ≈ time since the last i1 event (130 values, 44% at the floor). a2/a3 are high right after i1 events (Spearman −0.41/−0.36 with time since the last i1 trade/transition).
+- **Mask.** P(scored | i1 transition at t) 0.16 vs 0.08; P(scored | i0 transition at t) 0.07 vs 0.10. HistGB AUC is 0.886 causal and 0.889 with the next 2 rows added. **The mask cannot be reconstructed for training weights (gate 0.93), so B3 is closed.**
+- **Raw examples (class 3).** Shapes cluster into best-price states that share labels. In one sequence, n1 flips 39 ↔ −1 between consecutive transitions, so the label depends on the current quote state in a jumpy way. The exact definition is not found and the realized-label line is parked.
+
+Next: tools/shape_gate.py (job theconqueror01/wunder-r2-shape-gate) stacks per-shape S/D lookup features on the train-only pair. Pass mark: +0.002 V1 in G1 and both G2 directions, against the ridge-on-predictions baseline.
