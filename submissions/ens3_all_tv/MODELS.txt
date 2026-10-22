@@ -1,0 +1,3 @@
+runs/gru_all_tv/best.pt
+runs/gru_all_tv_seed1/best.pt
+runs/gru_all_tv_seed2/best.pt

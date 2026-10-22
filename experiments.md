@@ -6,6 +6,30 @@ bootstrap (`python src/evaluate.py compare A B`) and does not hurt V3 beyond noi
 Views: V1 = valid, official mask · V2 = valid, all need_prediction rows · V3 = train holdout (splits/holdout.json, 800 seqs), all rows.
 Runtime: M2 us/row from `src/check_submission.py`; projected scorer minutes = us/row x 1.55 x 39.4M / 60e6 (limit 60, target <= 48).
 
+**Since 2026-10-22, the decision rule and runtime model are in `.claude/skills/connectome-experiment/SKILL.md`.**
+- `tools/judge.py` gives same-seed paired deltas with training noise included.
+- Scorer minutes ≈ 5.3 + 19.5·K.
+- LB ≈ 0.93·V1 + 0.0195.
+
+## Closed lines (check before proposing; reopen only with a materially different hypothesis)
+| line | verdict | evidence | would reopen it |
+|---|---|---|---|
+| width / capacity (h192, h384) | no gain, both recipes | 10-09 x_h192, 10-15 x_all_h384 | new inputs that change the bottleneck |
+| LSTM cell; CNN front-end; TBPTT 2k / 4k | no gain | 10-16, 10-15, 10-15 / 10-22 | — |
+| weight EMA; model soups; Pearson loss | no gain (≤ +0.0004) | 10-09, 10-16, 10-08 | — |
+| t0+t1 sum loss; distributional head as *output* | worse | 10-15 x_all_sum, x_all_s4000_dist | (the dist head as an aux term was never ablated) |
+| class-3 specialists; per-class calibration | no gain | 10-15 c3ft, calibration | — |
+| privileged-teacher distillation | no gain (student not label-noise-limited) | 10-21 distil_w1/w3 | — |
+| reservoir random filter bank | 0.6335, blending hurts | 10-16 | — |
+| valid emphasis ×3 / ×6 | LB = ×1; ×6 overfits | 10-21 | confounded: LB-tested share 36% vs validated 22% |
+| drop raw / vol blocks | worse out of period | 10-22 | — |
+| lr 2e-3, batch 32, 5 epochs, mask eps 0.03 | worse | 10-22, 10-15 | — |
+| lag / future / past-mean aux variants | within noise | 10-16 | fut targets: +0.0014 / +0.0002, never a 3rd seed |
+| decoded tick paths, i1 lead-lag, event clock (linear stacking gate) | ≤ +0.0005 | 10-16 gate_paths | exact target definition → features as GRU inputs |
+| reconstructed past targets (HistGB on 60 seqs) | +0.000 | 10-09 | exact target definition (realized labels) |
+| K=3 ensemble; bf16 / int8 kernels | timeout / slower / −0.0007 | 10-16, 10-18 | — |
+| causal-ensemble distillation | not run: teachers are in-sample, so it would distil memorisation | 10-22 review | cross-fitted teachers |
+
 | date | name | model | V1 | V2 | V3 | M2 us/row (proj. min) | LB | notes |
 |---|---|---|---|---|---|---|---|---|
 | 2026-10-07 | baseline | starterpack GRU 2x128, raw features | 0.6171 (t0 .5879, t1 .6462) | 0.4402 | 0.4035* | 27.3 (26) | 0.5935 (27m06s) | *baseline likely trained on these sequences, so V3 is not held out for it |
@@ -593,3 +617,26 @@ PASS, numba = torch to 1.7e-6 (runtime projection on the Kaggle CPU not meaningf
 all-rows views clearly up -> expected LB +0.0000 to +0.0010 over 0.65655.
 Seen-vs-unseen check from saved moments: gru_all_tvA vs gru_all_full on valid half A (seen) +0.0052 / half B (unseen)
 +0.0007; seed 1 +0.0061 / +0.0004 (class 3: +0.009 / +0.015 seen) -> a real memorisation gap; regularisation untested.
+
+## 2026-10-22: research review, round 2 (new session; workflow in .claude/skills/connectome-experiment/SKILL.md)
+
+The review (three independent specialists plus cross-review) had these key findings:
+- class 3 holds 66% of the residual error;
+- t0+t1 is not a pure cost (class 0 has positive |y|-weighted means for both targets);
+- the target is likely a "best exit" measure tied to i0 price changes;
+- the memorisation gap is +0.005 V1;
+- scorer time ≈ 5.3 + 19.5·K min;
+- LB ≈ 0.93·V1 + 0.0195.
+
+Pre-registered (running):
+- **2×2 screen.** Seeds 0 and 1; base cell = lr7e4_full / _seed1.
+  - Factor R = `--dropout 0.1`, motivated by the memorisation gap.
+  - Factor A = `--act-weight 0.2`: a training-only head for future i0 excursions, i0 price-change counts and mean |y| over the next 100/300 rows. The hidden state decodes future volatility at only 0.25.
+  - Extra run: lr7e4_wd1e3_full (weight decay 1e-3, seed 0).
+  - repro_lr7e4_full must reproduce lr7e4_full bit-identically; otherwise the base cell is retrained.
+  - Rule: `tools/judge.py --cells`; adopt a factor at a main effect ≥ +0.0006 V1 with V2/V3 not below −2 SE. Kill: both effects < +0.0003.
+  - Jobs: theconqueror01/wunder-r2-repro-drop, wunder-r2-act-s0; jitamb/wunder-r2-s1a, wunder-r2-s1b.
+- **A1 forensic probes** (CPU, theconqueror01/wunder-r2-forensics; tools/forensics.py): target anatomy (floor test, S purity), clock test, class-3 persistence, a0–a7, mask AUC.
+  - Gate G1: clear best-exit structure plus an identified clock → A2, the exact-definition search.
+  - Mask gate: AUC ≥ 0.93 with next-row features → reconstructed-mask training weights.
+- **K=1 runtime fallback** gru_all_tv_lr7e4_s1 (check job jitamb/wunder-r2-check-k1).
