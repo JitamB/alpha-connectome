@@ -1,0 +1,11 @@
+{
+  "runs": [
+    "runs/gru_all_tv_lr7e4",
+    "runs/gru_all_tv_lr7e4_seed1"
+  ],
+  "table": "results/shape_table_tv.npz",
+  "V3_holdout_in_sample": {
+    "pred": 0.4515372797154399,
+    "corrected": 0.4521901880695559
+  }
+}

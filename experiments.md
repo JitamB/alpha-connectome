@@ -34,6 +34,7 @@ Runtime: M2 us/row from `src/check_submission.py`; projected scorer minutes = us
 | reconstructed-mask training weights (B3) | closed: mask AUC 0.889 even with next-row features (gate 0.93) | 10-22 forensics_a1 | — |
 | regularisation: dropout 0.1, weight decay 1e-3 | dropout −0.0009 V1 (2 seeds), wd flat | 10-22 round 2 | — |
 | activity/range aux head (future excursions, price-change counts, mean abs y) | V1 −0.0002 main effect (2×2, 2 seeds) | 10-22 round 2 | — |
+| exact-shape lookup (S/D per exact i0 shape), post-hoc per-class ridge | V1 +0.00004 (G1), +0.0001 / +0.00004 (G2) | 10-22 corr | the GRU already has it |
 
 | date | name | model | V1 | V2 | V3 | M2 us/row (proj. min) | LB | notes |
 |---|---|---|---|---|---|---|---|---|
@@ -684,3 +685,16 @@ The memorisation gap is real (+0.005 on seen valid), but dropout and weight deca
 | both vs base | −0.0010 | −0.0014 | −0.0007 | −0.0018 | REJECT |
 
 The activity head by itself (paired) gives V1 −0.0004 / V2 −0.0004 / V3 +0.0004. Supervising future volatility and excursions adds nothing, even though the state decodes future volatility at only 0.25. Aux-target supervision is saturated, and **Track B is closed.**
+
+### 2026-10-22: exact-shape lookup correction (job jitamb/wunder-r2-corr; tools/fit_shape_correction.py, tables tools/build_shape_table.py)
+Method:
+- **Tables:** train non-holdout gives 85k shapes (count ≥ 2, 99.85% row coverage, 1.4 MB); train+valid gives 95k (1.6 MB). Only 2 of 236k shapes are mixed-class.
+- **Correction:** a per-class |y|-weighted ridge on [p0, p1, hit, log count, E[S·step], E[D·step], P(S bucket) × 4], fitted on the train holdout.
+
+| protocol (train-only pair lr7e4_full + _seed1) | V1 | delta |
+|---|---|---|
+| G1: fit on holdout, score valid | 0.68334 → 0.68339 | **+0.00004** (V2 +0.00012; each class −0.0001 to −0.0005) |
+| G2: fit on valid A, score B / fit on B, score A | | +0.00010 / +0.00004 |
+| in-sample on holdout (all rows) | 0.4502 → 0.4508 | +0.0006 (in-sample only) |
+
+The shape-determined cost part S is already captured by the GRU pair's predictions; the old "corr(p0+p1, S) = 0.03 on class-3 scored rows" did not mean the information was missing. **The shape-lookup line is closed.** It is not packaged: the train+valid coefficients (results/corr_tv_lr7e4.npz) are kept but not shipped.
