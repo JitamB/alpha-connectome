@@ -30,8 +30,35 @@ def _decay_mats(span, L, device):
 
 
 @torch.no_grad()
-def torch_features(X, chunk=1000):
-    """X: (B, T, 112) float32 tensor -> (B, T, 672) float32, same column layout as features.batch_features."""
+def torch_clock_features(X):
+    """GPU equivalent of features.clock_features; X is (B, T, 112)."""
+    _, T, _ = X.shape
+    t = torch.arange(T, device=X.device, dtype=torch.long)[None]
+
+    def changed(cols):
+        x = X[..., cols]
+        return torch.cat([torch.zeros_like(x[:, :1, 0], dtype=torch.bool), (x[:, 1:] != x[:, :-1]).any(-1)], 1)
+
+    def since(flag):
+        last = torch.cummax(torch.where(flag, t, torch.zeros_like(t)), 1).values
+        return torch.log1p((t - last).float())
+
+    def rate(flag, width):
+        cs = torch.cat([torch.zeros_like(flag[:, :1], dtype=torch.float32), flag.float().cumsum(1)], 1)
+        lo = (torch.arange(T, device=X.device) + 1 - width).clamp_min(0)
+        return (cs[:, 1:] - cs[:, lo]) / width
+
+    tr0, tr1 = changed(slice(0, 22)), changed(slice(52, 74))
+    td0, td1 = changed([44, 48]), changed([96, 100])
+    pos = torch.arange(T, device=X.device, dtype=X.dtype)[None] / max(T - 1, 1)
+    return torch.stack([since(tr0), since(tr1), since(td0), since(td1),
+                        rate(tr0, 100), rate(tr1, 100), rate(tr0, 1000), rate(tr1, 1000),
+                        pos.expand_as(tr0), (pos * pos).expand_as(tr0)], -1)
+
+
+@torch.no_grad()
+def torch_features(X, chunk=1000, clock=False):
+    """X: (B, T, 112) -> engineered features, optionally followed by the clock extension."""
     B, T, F = X.shape
     diff = torch.cat([torch.zeros_like(X[:, :1]), X[:, 1:] - X[:, :-1]], dim=1)
     absdiff = diff.abs()
@@ -51,4 +78,5 @@ def torch_features(X, chunk=1000):
         vols.append(e)
         vol_state = e[:, -1:]
     blocks = [X, diff] + [X - torch.cat(emas[h], dim=1) for h in EMA_SPANS] + [torch.cat(vols, dim=1)]
-    return torch.cat(blocks, dim=-1)
+    out = torch.cat(blocks, dim=-1)
+    return torch.cat([out, torch_clock_features(X)], -1) if clock else out

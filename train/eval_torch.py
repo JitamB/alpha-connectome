@@ -54,7 +54,7 @@ def load(run: Path, weights: str, device, quant='none'):
     model.table = table    # exact-shape lookup inputs, see train_gru --shape-table
     if quant != 'none':
         quantize_model(model, quant)
-    return model.to(device).eval(), cfg['features'] == 'eng'
+    return model.to(device).eval(), cfg['features']
 
 
 if __name__ == '__main__':
@@ -102,10 +102,11 @@ if __name__ == '__main__':
     @torch.no_grad()
     def predict(Xb):
         X = torch.from_numpy(Xb).to(device)
-        F = torch_features(X) if any(eng for _, eng in models) else None
+        F = torch_features(X, clock=any(feature == 'engclock' for _, feature in models)) \
+            if any(feature != 'raw' for _, feature in models) else None
         preds = []
-        for m, eng in models:
-            inp = F if eng else X
+        for m, feature in models:
+            inp = F if feature == 'engclock' else (F[..., :TRANSFORMS['eng'][0]] if feature == 'eng' else X)
             if m.table is not None:
                 L = np.stack([shape_features(x, *m.table)[0] for x in Xb])
                 inp = torch.cat([inp, torch.from_numpy(L).to(device)], -1)

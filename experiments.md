@@ -36,6 +36,7 @@ Runtime: M2 us/row from `src/check_submission.py`; projected scorer minutes = us
 | activity/range aux head (future excursions, price-change counts, mean abs y) | V1 −0.0002 main effect (2×2, 2 seeds) | 10-22 round 2 | — |
 | exact-shape lookup (S/D per exact i0 shape): post-hoc ridge, stacking gate, HistGB | V1 +0.00004 / +0.00001 (G1), HistGB worse | 10-22 corr, shape_gate | the GRU already has it |
 | class-conditional joint tick-pair CE and metric-aware joint decoder | joint loss V1 −0.00012 / c3 −0.00063; decoded output V1 −0.00214 | 10-22 jointpair (2 seeds) | causal c3 transition representation, not a larger output distribution |
+| explicit book/trade timers, transition rates, and row-position inputs | V1 −0.00058 / c3 −0.00064 (2 seeds); V3 +0.00105 does not transfer | 10-23 clock | materially different causal state-transition inputs |
 
 | date | name | model | V1 | V2 | V3 | M2 us/row (proj. min) | LB | notes |
 |---|---|---|---|---|---|---|---|---|
@@ -642,6 +643,22 @@ Seen-vs-unseen check from saved moments: gru_all_tvA vs gru_all_full on valid ha
 | joint-pair decoded, seed 0 / 1 | 0.67886 / 0.68084 | 0.50410 / 0.50628 | 0.44554 / 0.44609 | vs candidate regression: V1 **−0.00203**, V2 **−0.00414**, V3 **−0.00253**; vs base V1 **−0.00214** |
 
 The class router is accurate on 99.41% / 99.15% of V1 sequences (98.75% / 98.63% V3), so wrong class routing does not explain the failure. The joint CE changes neither the regression solution nor class 3 in the required direction, while metric-aware marginal decoding from the learned joint distribution is strongly worse on all views. Close the class-conditional joint tick-pair loss and this exact decoder; any future use of target coupling needs a representation tied to a causal c3 state transition, rather than a larger output distribution.
+
+## 2026-10-22: preregistration — explicit causal state-clock inputs (Experiment 2)
+- **Hypothesis:** the class-3 residual has slow *row-time* dependence (row-lag-100 autocorrelation 0.44 versus event-lag-20 0.08), while its exact book state flickers at a median segment length of one. The GRU currently has to infer and preserve elapsed-time counters from raw changes. Supplying exact causal book/trade timers, trailing transition rates, and row position lets it learn state × elapsed-time interactions through its projection and recurrent layers. This materially differs from the closed linear event-clock stacker: the features are inputs to the nonlinear causal model, not a post-hoc correction to its predictions.
+- **Features:** log elapsed rows since exact i0/i1 22-price-book changes and i0/i1 trade changes; i0/i1 transition rates over trailing 100 and 1000 rows; normalized row position and its square. No target-derived table, future row, or valid label is used.
+- **Primary comparison:** two train-only seeds (`clock_s0`, `clock_s1`) against paired `lr7e4_full` / `lr7e4_full_seed1`. The recipe remains lr 7e-4, 3 epochs, mask proxy, lag and future-feature auxiliary losses, and marginal distribution auxiliary loss. Primary view is clean V1; class-3 V1 is the mechanism check. V2/V3 can veto.
+- **Decision rule:** candidate only at mean paired V1 ≥ +0.0009, neither seed below −0.0006, class 3 improves, and V2/V3 are not below −2 SE. If class 3 does not improve, close this exact state-clock input set rather than searching timer scales.
+- **Cost:** code only; Kaggle data fetch ~12 min, two T4 runs in parallel ~85 min (the small clock block adds minor feature work), V1/V2/V3 evaluation ~10 min; total target ~1h50m. The Mac performs orchestration only. Export/runtime work is deferred until the train-only screen passes.
+
+### Result — REJECT (Kaggle jobs `theconqueror01/wunder-clock-exp2`, `theconqueror01/wunder-clock-eval`)
+
+| comparison | V1 | V2 | V3 | class 3 V1 |
+|---|---:|---:|---:|---:|
+| `clock_s0` / `clock_s1` scores | 0.68109 / 0.68174 | 0.50889 / 0.50851 | 0.44772 / 0.44948 | — |
+| paired vs `lr7e4_full` / `_seed1` | **−0.00058** (SE 0.00056) | −0.00006 | +0.00105 | **−0.00064** |
+
+Both seeds miss the V1 criterion (−0.00069 / −0.00046) and both reduce class 3 (−0.00101 / −0.00028). The V3 gain shows the timers can fit train-period temporal structure, but its failure on clean V1 rules out this direct elapsed-time representation. Close these ten clock inputs as a class-3 route; do not tune timer scales or row-position parameterizations.
 
 The review (three independent specialists plus cross-review) had these key findings:
 - class 3 holds 66% of the residual error;
