@@ -546,3 +546,13 @@ lr 7e-4 singles: V1 0.6818 / 0.6822 / 0.6822 (mean 0.6821, vs 0.6811 at 1e-3). C
 zero inference cost -> **adopted** (just under the +0.0012 V1 bar on the mean, but no run went the other way).
 Next: job wunder-tv-lr7e4 (final pair on train + all valid at 7e-4 + eval of the train-only 7e-4 pair vs ens2_all_full)
 and job wunder-opt (batch 32 and 4 epochs at 7e-4, paired vs lr7e4_full).
+
+### 2026-10-22: lr 7e-4 final pair (job wunder-tv-lr7e4)
+| name | V1 | V2 | V3 | paired delta |
+|---|---|---|---|---|
+| pair_lr7e4 (lr7e4_full + _seed1, train only) | 0.6833 | 0.5115 | 0.4502 | vs ens2_all_full: +0.0005 (z 2.1) / +0.0001 / -0.0004 |
+| gru_all_tv_lr7e4 (train + all valid) | (0.6872 seen) | (0.5211 seen) | 0.4482 | V3 vs gru_all_tv +0.0005 |
+| gru_all_tv_lr7e4_seed1 | (0.6878 seen) | (0.5218 seen) | 0.4496 | V3 vs gru_all_tv_seed1 +0.0004 |
+The single-model gain (+0.0010 V1) shrinks to ~+0.0005 after 2-model averaging (part of what lr 7e-4 fixes is
+seed-level variance that averaging already removes). Packaged submissions/ens2_all_tv_lr7e4 (same shapes as
+ens2_all_tv); expected LB ~ +0.0004 over 0.6562 -- inside scorer noise, optional upload. Checks: job wunder-check-lr7e4.
