@@ -588,7 +588,8 @@ candidate (job wunder-tv-e4: gru_all_tv_lr7e4_e4 / _seed1 + eval of the train-on
 |---|---|---|---|---|
 | pair_lr7e4_e4 (train-only 4-epoch pair) | 0.6836 | 0.5134 | 0.4527 | vs pair_lr7e4: +0.0003 / **+0.0019 (z 5.7)** / **+0.0025 (z 3.6)** |
 | gru_all_tv_lr7e4_e4 / _seed1 (train + all valid) | (0.6897 seen) | (0.5245 / 0.5252 seen) | 0.4504 / 0.4504 | V3 vs 3-epoch tv twins +0.0022 / +0.0008 |
-Packaged submissions/ens2_all_tv_lr7e4_e4 (same shapes -> ~44 min); checks: job wunder-check-e4. V1 is flat at pair level,
+Packaged submissions/ens2_all_tv_lr7e4_e4 (same shapes -> ~44 min); checks (job wunder-check-e4): all correctness checks
+PASS, numba = torch to 1.7e-6 (runtime projection on the Kaggle CPU not meaningful). V1 is flat at pair level,
 all-rows views clearly up -> expected LB +0.0000 to +0.0010 over 0.65655.
 Seen-vs-unseen check from saved moments: gru_all_tvA vs gru_all_full on valid half A (seen) +0.0052 / half B (unseen)
 +0.0007; seed 1 +0.0061 / +0.0004 (class 3: +0.009 / +0.015 seen) -> a real memorisation gap; regularisation untested.
