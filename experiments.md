@@ -729,3 +729,6 @@ What carries forward:
 - the second Kaggle account.
 
 ens2_all_tv_lr7e4 (LB 0.65655) stays primary.
+
+### 2026-10-22: LB of ens2_all_tv_lr7e4_e4 (4-epoch pair)
+**LB 0.65702** (44m27s, 683 MB), +0.00047 over ens2_all_tv_lr7e4 (0.65655): a new best by a hair. On its own the gap is within the LB noise for near-identical packages, but it agrees in sign with the local pair evidence (V1 +0.0003, V2 +0.0019 (z 5.7), V3 +0.0025 (z 3.6)). It becomes co-primary.
