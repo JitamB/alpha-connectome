@@ -370,9 +370,14 @@ def main():
                     help='PRIVILEGED TEACHER: also feed mean(x[t+1..t+h]) - x[t] for each h (non-causal, never exported)')
     ap.add_argument('--train-half', type=int, choices=[0, 1],
                     help='train only on train row groups with group %% 2 == this (cross-fitted teachers)')
-    ap.add_argument('--teacher', nargs=2, metavar=('RUN_HALF0', 'RUN_HALF1'),
+    ap.add_argument('--teacher', nargs='+',
                     help='distil from two cross-fitted teachers: a sequence with group %% 2 == k gets the teacher trained on '
-                         'the other half (valid sequences: half-0 teacher)')
+                         'the other half (valid sequences: half-0 teacher); with --teacher-folds see there')
+    ap.add_argument('--teacher-folds', type=int,
+                    help='N: --teacher lists N x S causal teachers, fold-major; teachers k*S..k*S+S-1 were trained with '
+                         '--exclude-fold k N, and a train sequence with group %% N == k gets their mean (valid: all teachers)')
+    ap.add_argument('--exclude-fold', type=int, nargs=2, metavar=('K', 'N'),
+                    help='drop train row groups with group %% N == K (cross-fitted teachers for --teacher-folds)')
     ap.add_argument('--teacher-weight', type=float, default=1.0,
                     help='weight of the |y|-weighted MSE to the clipped teacher prediction (added to the target loss)')
     ap.add_argument('--drop-blocks', nargs='+', choices=BLOCKS, default=[],
@@ -394,6 +399,8 @@ def main():
     assert not (args.shape_table and (args.future_inputs or args.teacher or args.conv)), 'shape table: plain recipe only'
     table = load_table(args.shape_table) if args.shape_table else None
     assert not (args.i1_table and (args.shape_table or args.future_inputs or args.teacher or args.conv)), 'i1 table: plain recipe only'
+    assert not args.teacher or (len(args.teacher) == 2 if args.teacher_folds is None else len(args.teacher) % args.teacher_folds == 0), \
+        '--teacher: two half teachers, or N x S teachers with --teacher-folds N'
     i1 = (i1_lead.load_tables(args.i1_table), set(holdout_groups())) if args.i1_table else None
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -409,6 +416,8 @@ def main():
         groups = sorted(rng.choice(groups, args.max_train_seqs, replace=False).tolist())
     if args.train_half is not None:
         groups = [g for g in groups if g % 2 == args.train_half]
+    if args.exclude_fold:
+        groups = [g for g in groups if g % args.exclude_fold[1] != args.exclude_fold[0]]
     if args.no_train:
         groups = []
     groups += [VALID_OFFSET + g for g in VALID_SPLITS[args.valid_groups]] * args.valid_repeat
@@ -517,14 +526,23 @@ def main():
             Xraw = X
             if args.gpu_features:
                 X = engineer(X, clock=args.features == 'engclock')
-            if teachers is not None:  # per sequence: the teacher that did not see it (see --teacher)
+            if teachers is not None:  # per sequence: the teacher(s) that did not see it (see --teacher, --teacher-folds)
                 order = [g for g in batches[b] if g < VALID_OFFSET] + [g for g in batches[b] if g >= VALID_OFFSET]
-                pick = [0 if g >= VALID_OFFSET else 1 - g % 2 for g in order]
+                if args.teacher_folds is None:
+                    pick = [0 if g >= VALID_OFFSET else 1 - g % 2 for g in order]
+                    cover = [[i for i, k in enumerate(pick) if k == j] for j in range(len(teachers))]
+                else:
+                    S = len(teachers) // args.teacher_folds
+                    cover = [[i for i, g in enumerate(order) if g >= VALID_OFFSET or g % args.teacher_folds == j // S]
+                             for j in range(len(teachers))]
+                cnt = torch.zeros(len(order), device=device)
+                for ix in cover:
+                    cnt[ix] += 1
                 tsel = []
                 for j, (t, fut) in enumerate(teachers):
-                    ix = torch.tensor([i for i, k in enumerate(pick) if k == j], device=device, dtype=torch.long)
+                    ix = torch.tensor(cover[j], device=device, dtype=torch.long)
                     if len(ix):
-                        tsel.append((t, ix, torch.cat([X[ix], future_features(Xraw[ix], fut)], -1)))
+                        tsel.append((t, ix, X[ix] if not fut else torch.cat([X[ix], future_features(Xraw[ix], fut)], -1)))
                 th = [None] * len(tsel)
             if args.future_inputs:
                 X = torch.cat([X, future_features(Xraw, args.future_inputs)], -1)
@@ -560,7 +578,8 @@ def main():
                     with torch.no_grad():
                         tp = torch.zeros_like(pred)
                         for k, (t, ix, XT) in enumerate(tsel):
-                            tp[ix], th[k] = t(XT[:, c:c + args.chunk], th[k])
+                            out, th[k] = t(XT[:, c:c + args.chunk], th[k])
+                            tp[ix] += out / cnt[ix, None, None]
                     yc = Y[:, c + lo:c + args.chunk].clamp(-CLIP, CLIP)
                     wt = yc.abs() if mw is None else yc.abs() * R[:, c + lo:c + args.chunk, None]
                     distil = (wt * (pred[:, lo:] - tp[:, lo:].clamp(-CLIP, CLIP)) ** 2).sum() / wt.sum().clamp_min(1e-8)
