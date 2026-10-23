@@ -872,3 +872,18 @@ Operational: in-job eval at batch 32 ran out of GPU memory once the 6 extra colu
 - **Why:** class 3 is ~47% of the V1 weight at 0.43 versus 0.73–0.80 elsewhere. Eleven class-3 levers are closed, all chosen from hypotheses. Before the next lever, measure *where* the class-3 shortfall lives. Covered: which |y| sizes carry the weighted covariance, segment age, cost vs direction part, calibration, per sequence vs within sequence, and future-event conditioning. That measurement says which kinds of information could ever pay.
 - **Dump:** the train-only pair (lr7e4_full + _seed1, valid unseen) on every scored valid row of classes 3 and 2 (class 2 as the closest well-scored contrast). Per row: predictions, ticks, causal covariates (time since the last i0/i1 change, change counts, shape index), future-looking analysis columns (rows to the next i0 change, ticks at t+100/t+300/next change), and the raw 112 features on every 4th row. Analysis then runs locally on the npz with numpy only.
 - **Cost:** Kaggle fetch ~12 min + ~5 min GPU inference; download ~150 MB to the scratchpad (not committed).
+
+### Result — class-3 error anatomy (job theconqueror01/wunder-r3-c3-anatomy; 1.72M scored class-3 rows / 697 seqs, 0.28M class-2 rows / 431 seqs; npz 89 MB kept out of git, regenerate with tools/c3_anatomy.py)
+**1. The class-3 label is almost a 4-outcome variable.** Joint (n0, n1) on scored class-3 rows: (0,−1) 36.9%, (−1,0) 32.1%, (1,−3) 9.2%, (−3,1) 8.3%, (2,−3) 3.6%, (−3,2) 3.3%, (±3,∓3) 1.4% each, (−1,−1) 1.0%. Whenever one side is ≥ +1 the other is exactly −3 ("up": (k,−3), 15.4%; "down": (−3,k), 14.2%). Otherwise the pair is "neutral", (0,−1) or (−1,0) (69%). n = −2 almost never occurs (0.2%). Class 2 has the same shape (up 20%, down 28%, neutral 44%, other 8%).
+**2. Transition algebra.** After (0,−1) the next i0 change gives (−1,−1) 79% of the time; after (−1,0), (−1,−1) 79%; after up (1,−3), (0,−2) 44% or (1,−4) 18%. Consistent with n0 = F − ask, n1 = bid − F' with references F, F' that stay fixed while the quote moves (the 98.5% transition→Δn decode of 10-16 says the same). Being tested by tools/episode_probe.py.
+**3. Where the score is lost: time to the next i0 change (future-looking, analysis only).**
+| rows until next i0 change | 1–4 | 5–20 | 21–100 | ≥ 101 |
+|---|---:|---:|---:|---:|
+| class 3: share of rows / weight | 0.32 / 0.24 | 0.18 / 0.20 | 0.26 / 0.29 | 0.24 / 0.28 |
+| class 3 WP | 0.65–0.75 | 0.73 | **0.34** | **0.11** |
+| class 3 AUC up vs down / (0,−1) vs (−1,0) | 0.97 / 0.98 | 0.97 / 0.95 | 0.74 / 0.66 | **0.58 / 0.56** |
+| class 2 share of rows | 0.42 | 0.29 | 0.20 | 0.10 |
+| class 2 WP | 0.84 | 0.82 | 0.43 | 0.14 |
+The model reads the label almost perfectly when the next quote change is imminent and barely at all when it is ≥ 100 rows away. Class 3 has 50% of its rows ≥ 21 rows from the next change (class 2: 30%). That, plus the neutral-heavy label mix, is the class-3 deficit. Rows whose label is unchanged for the next 100 rows: class-3 WP 0.10 vs 0.59 for the rest.
+**4. Other numbers.** Class-3 WP 0.4308; oracle D 0.989, oracle S 0.498; oracle per-sequence offset 0.521 (but sequence means do not persist, 10-22). corr(pS, S) = 0.056 on scored rows. True S is flat at −0.37 across all pS deciles, i.e. pS is noise there, while pD is over-dispersed (calibration slope ~0.65, the same in class 2).
+**5. Closed on the way.** State-dependent recalibration (per-target ridge of y on [1, p0, p1] per bucket of age0 × i0/i1 change counts, half A→B and B→A) is ≤ 0 for classes 3 and 2. Ensemble gains are uniform across classes (pair − single: +0.0016…+0.0021 per class; ens3 − ens2 class 3 +0.0007), so a class-routed ensemble (K=3 for class 3, K=1 for the rest) cannot pay.
