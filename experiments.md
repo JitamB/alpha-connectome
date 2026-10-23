@@ -40,6 +40,7 @@ Runtime: M2 us/row from `src/check_submission.py`; projected scorer minutes = us
 | class-3 target-innovation (one-row delta) auxiliary loss | V1 −0.00003 / c3 −0.00005 (2 seeds) | 10-23 delta_c3 | a different causal target, not loss-weight tuning |
 | class-3 ordered entry-transition target table | c3 V1 −0.00145 G1 / −0.00031, −0.00086 G2 | 10-23 entry gate | a causal target definition beyond i0 state history |
 | volume-queue imbalance (role-agnostic: 366 candidates, screen + stacking gate + HistGB) | screen below null and not replicated; gate V1 −0.0012 / −0.0023 / −0.0012 (c3 −0.0020 / −0.0087 / −0.0050) | 10-23 imbalance_probe | volume columns are a decorrelated basis, not a queue ladder |
+| i1 lead-lag as GRU input (out-of-fold i1 transition-type tables, 6 window-sum features) | V1 +0.00016 (seeds −0.00023 / +0.00055), c3 +0.00022, V3 +0.00097 | 10-23 i1lead (2 seeds) | label-derived i1 decoding adds nothing on clean V1 |
 
 | date | name | model | V1 | V2 | V3 | M2 us/row (proj. min) | LB | notes |
 |---|---|---|---|---|---|---|---|---|
@@ -852,3 +853,17 @@ HistGB on [pred, aggregates, class]: V1 0.68175 vs 0.68334 for the bare pair (�
 - **Decision rule:** candidate only if the 2-seed mean paired V1 is >= +0.0009, neither seed is below −0.0006, class 3 improves, and V2/V3 are not below −2 SE. No timer-scale or horizon sweeps after a rejection. If it passes, the table (~600k keys) must also be packaged and timed for the scorer before any submission; this is not an eligible model yet.
 - **Mac checks (seconds, random data):** `i1_lead.features` equals gate_paths' 'i1enc' features exactly (max abs diff 0.0); the fold tables exclude their own fold; syntax of the edited train/eval scripts. Default path: every new branch is gated on `--i1-table`; the default-path repro from 10-23 11:13 IST (eb39f21) covers the code before this edit, and these two seeds do not re-prove it.
 - **Cost:** table build job (CPU only, no GPU quota): fetch ~12 min + 4-worker stream ~10 min = ~25 min. Then the training job (2 T4, one seed each): fetch ~12 min + 3-epoch run ~80 min + eval ~10 min = ~1h45m. Total about 2h15m end to end.
+
+### Result — REJECT (Kaggle jobs theconqueror01/wunder-r3-i1-table, wunder-r3-i1lead, wunder-r3-i1lead-eval; judge: runs/i1lead_judge.log)
+Table: results/i1_table.npz (19 MB, sha256 68c46e8a07e73cd6faa38fba6a09909b58570b2db6f18907b3e70e4b4d1787fe, not committed; rebuild with `tools/build_i1_table.py --out results/i1_table.npz`). Full table 369k i1 transition types from 20.4M transitions; each out-of-fold table ~290k types.
+
+| comparison (paired to lr7e4_full / _seed1) | V1 | V2 | V3 | class-3 V1 |
+|---|---:|---:|---:|---:|
+| i1lead_s0 / i1lead_s1 scores | 0.68156 / 0.68275 | 0.50857 / 0.51040 | 0.44822 / 0.44880 | — |
+| per seed delta | −0.00023 / +0.00055 | −0.00038 / +0.00183 | +0.00140 / +0.00053 | −0.00079 / +0.00123 |
+| mean (SE) | **+0.00016** (0.00054) | +0.00072 (0.00059) | +0.00097 (0.00071) | **+0.00022** (0.00088) |
+Per class V1: c0 −0.00011, c1 −0.00038, c2 **+0.00129** (z 2.2), c3 +0.00022, V1t +0.00003. The candidate bar was +0.0009 with class 3 improving; both seeds fail it (mean +0.00016, class 3 +0.00022 with the seeds on opposite sides). Verdict REJECT.
+
+Reading: the i1 → i0 information gave the GRU nothing measurable on the class that matters (class 3). The V3 gain (+0.0010) is again a train-period gain that does not appear on clean V1, the same pattern as the clock inputs. The one positive cell, class 2 (+0.0013, z 2.2 in a family of 8 views), is not a pre-registered claim and is not acted on. Together with the 10-16 linear gate (class 3 +0.0009…+0.0016, V2 inconsistent), this closes i1 lead-lag as a class-3 route.
+
+Operational: in-job eval at batch 32 ran out of GPU memory once the 6 extra columns made a second copy of the 678-column input; training and checkpoints were fine. Evaluation was rerun with `--batch 16` (kaggle/run_job.py now lets an `eval:` run pass its own --batch).

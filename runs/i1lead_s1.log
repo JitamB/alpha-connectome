@@ -1,0 +1,138 @@
+epoch 0 batch 20/613 loss 1.5427 aux 0.8467 lag 1.5832 ce 0.7894 lr 1.04e-04 142k rows/s
+epoch 0 batch 40/613 loss 1.5514 aux 0.7047 lag 1.3813 ce 0.5699 lr 2.96e-04 143k rows/s
+epoch 0 batch 60/613 loss 1.4652 aux 0.6431 lag 1.1658 ce 0.4721 lr 5.19e-04 143k rows/s
+epoch 0 batch 80/613 loss 1.4929 aux 0.6327 lag 0.9444 ce 0.4396 lr 6.73e-04 143k rows/s
+epoch 0 batch 100/613 loss 1.4944 aux 0.5738 lag 0.8870 ce 0.4198 lr 7.00e-04 143k rows/s
+epoch 0 batch 120/613 loss 1.4887 aux 0.5623 lag 0.7492 ce 0.4037 lr 7.00e-04 143k rows/s
+epoch 0 batch 140/613 loss 1.4470 aux 0.5074 lag 0.7319 ce 0.3712 lr 6.99e-04 143k rows/s
+epoch 0 batch 160/613 loss 1.4547 aux 0.5214 lag 0.7675 ce 0.3769 lr 6.97e-04 143k rows/s
+epoch 0 batch 180/613 loss 1.4523 aux 0.4633 lag 0.7011 ce 0.4290 lr 6.96e-04 143k rows/s
+epoch 0 batch 200/613 loss 1.4580 aux 0.4691 lag 0.7154 ce 0.3954 lr 6.93e-04 143k rows/s
+epoch 0 batch 220/613 loss 1.4516 aux 0.4501 lag 0.6440 ce 0.3874 lr 6.91e-04 143k rows/s
+epoch 0 batch 240/613 loss 1.4600 aux 0.4699 lag 0.7056 ce 0.3778 lr 6.88e-04 143k rows/s
+epoch 0 batch 260/613 loss 1.4341 aux 0.4756 lag 0.6047 ce 0.3901 lr 6.84e-04 143k rows/s
+epoch 0 batch 280/613 loss 1.5447 aux 0.4909 lag 0.6551 ce 0.3980 lr 6.80e-04 143k rows/s
+epoch 0 batch 300/613 loss 1.3789 aux 0.4621 lag 0.6001 ce 0.4077 lr 6.76e-04 143k rows/s
+epoch 0 batch 320/613 loss 1.4923 aux 0.4522 lag 0.6340 ce 0.3963 lr 6.71e-04 143k rows/s
+epoch 0 batch 340/613 loss 1.4276 aux 0.4642 lag 0.5908 ce 0.4441 lr 6.66e-04 143k rows/s
+epoch 0 batch 360/613 loss 1.3693 aux 0.5060 lag 0.5455 ce 0.3889 lr 6.60e-04 143k rows/s
+epoch 0 batch 380/613 loss 1.3559 aux 0.5378 lag 0.6033 ce 0.3889 lr 6.54e-04 143k rows/s
+epoch 0 batch 400/613 loss 1.4042 aux 0.4253 lag 0.5848 ce 0.4012 lr 6.48e-04 143k rows/s
+epoch 0 batch 420/613 loss 1.4989 aux 0.5013 lag 0.5691 ce 0.4039 lr 6.41e-04 143k rows/s
+epoch 0 batch 440/613 loss 1.4765 aux 0.3912 lag 0.6164 ce 0.3824 lr 6.34e-04 142k rows/s
+epoch 0 batch 460/613 loss 1.4205 aux 0.4781 lag 0.5670 ce 0.3949 lr 6.26e-04 142k rows/s
+epoch 0 batch 480/613 loss 1.3444 aux 0.4085 lag 0.5476 ce 0.3907 lr 6.18e-04 142k rows/s
+epoch 0 batch 500/613 loss 1.4025 aux 0.4340 lag 0.5178 ce 0.3926 lr 6.10e-04 142k rows/s
+epoch 0 batch 520/613 loss 1.3447 aux 0.3916 lag 0.5402 ce 0.3677 lr 6.01e-04 142k rows/s
+epoch 0 batch 540/613 loss 1.3657 aux 0.4320 lag 0.5635 ce 0.3615 lr 5.92e-04 142k rows/s
+epoch 0 batch 560/613 loss 1.4399 aux 0.4341 lag 0.5873 ce 0.3848 lr 5.83e-04 142k rows/s
+epoch 0 batch 580/613 loss 1.4015 aux 0.4388 lag 0.5172 ce 0.4037 lr 5.74e-04 141k rows/s
+epoch 0 batch 600/613 loss 1.4219 aux 0.4542 lag 0.5358 ce 0.3835 lr 5.64e-04 141k rows/s
+epoch 0 batch 613/613 loss 1.3808 aux 0.4167 lag 0.5346 ce 0.4302 lr 5.57e-04 141k rows/s
+== epoch 0: monitor WP (holdout, all rows) 0.41695
+epoch 1 batch 20/613 loss 1.4747 aux 0.4910 lag 0.5041 ce 0.4259 lr 5.47e-04 147k rows/s
+epoch 1 batch 40/613 loss 1.4198 aux 0.4510 lag 0.5278 ce 0.4017 lr 5.36e-04 147k rows/s
+epoch 1 batch 60/613 loss 1.4477 aux 0.4463 lag 0.5457 ce 0.3904 lr 5.26e-04 147k rows/s
+epoch 1 batch 80/613 loss 1.4255 aux 0.3772 lag 0.5704 ce 0.4065 lr 5.15e-04 145k rows/s
+epoch 1 batch 100/613 loss 1.4389 aux 0.4059 lag 0.5686 ce 0.3798 lr 5.03e-04 145k rows/s
+epoch 1 batch 120/613 loss 1.3775 aux 0.4325 lag 0.5334 ce 0.3760 lr 4.92e-04 145k rows/s
+epoch 1 batch 140/613 loss 1.4019 aux 0.4042 lag 0.5758 ce 0.3648 lr 4.80e-04 145k rows/s
+epoch 1 batch 160/613 loss 1.3917 aux 0.4946 lag 0.5700 ce 0.3826 lr 4.69e-04 144k rows/s
+epoch 1 batch 180/613 loss 1.3928 aux 0.4453 lag 0.5061 ce 0.3879 lr 4.57e-04 144k rows/s
+epoch 1 batch 200/613 loss 1.4378 aux 0.3722 lag 0.5692 ce 0.3823 lr 4.45e-04 144k rows/s
+epoch 1 batch 220/613 loss 1.4552 aux 0.4063 lag 0.5149 ce 0.4058 lr 4.33e-04 144k rows/s
+epoch 1 batch 240/613 loss 1.3802 aux 0.4427 lag 0.5207 ce 0.3807 lr 4.20e-04 144k rows/s
+epoch 1 batch 260/613 loss 1.3872 aux 0.4305 lag 0.5091 ce 0.3881 lr 4.08e-04 144k rows/s
+epoch 1 batch 280/613 loss 1.4524 aux 0.3975 lag 0.5946 ce 0.3599 lr 3.95e-04 144k rows/s
+epoch 1 batch 300/613 loss 1.4146 aux 0.4792 lag 0.4729 ce 0.3694 lr 3.83e-04 144k rows/s
+epoch 1 batch 320/613 loss 1.4393 aux 0.3572 lag 0.4739 ce 0.3755 lr 3.70e-04 144k rows/s
+epoch 1 batch 340/613 loss 1.3385 aux 0.4306 lag 0.5156 ce 0.3719 lr 3.58e-04 144k rows/s
+epoch 1 batch 360/613 loss 1.4550 aux 0.3972 lag 0.5452 ce 0.3802 lr 3.45e-04 144k rows/s
+epoch 1 batch 380/613 loss 1.3797 aux 0.3871 lag 0.5112 ce 0.3729 lr 3.33e-04 143k rows/s
+epoch 1 batch 400/613 loss 1.3785 aux 0.4170 lag 0.4589 ce 0.3526 lr 3.20e-04 143k rows/s
+epoch 1 batch 420/613 loss 1.4007 aux 0.3712 lag 0.5348 ce 0.3605 lr 3.08e-04 143k rows/s
+epoch 1 batch 440/613 loss 1.3403 aux 0.4148 lag 0.5034 ce 0.3911 lr 2.95e-04 143k rows/s
+epoch 1 batch 460/613 loss 1.4098 aux 0.3978 lag 0.5729 ce 0.3630 lr 2.83e-04 143k rows/s
+epoch 1 batch 480/613 loss 1.3701 aux 0.4325 lag 0.5186 ce 0.3815 lr 2.70e-04 143k rows/s
+epoch 1 batch 500/613 loss 1.4225 aux 0.3689 lag 0.5084 ce 0.3664 lr 2.58e-04 142k rows/s
+epoch 1 batch 520/613 loss 1.4335 aux 0.3457 lag 0.5469 ce 0.3526 lr 2.46e-04 142k rows/s
+epoch 1 batch 540/613 loss 1.4369 aux 0.4042 lag 0.5031 ce 0.4129 lr 2.34e-04 142k rows/s
+epoch 1 batch 560/613 loss 1.3867 aux 0.3778 lag 0.5172 ce 0.3620 lr 2.22e-04 142k rows/s
+epoch 1 batch 580/613 loss 1.4203 aux 0.3907 lag 0.5254 ce 0.3549 lr 2.11e-04 142k rows/s
+epoch 1 batch 600/613 loss 1.3571 aux 0.3973 lag 0.4992 ce 0.3747 lr 1.99e-04 141k rows/s
+epoch 1 batch 613/613 loss 1.3210 aux 0.4102 lag 0.5301 ce 0.3882 lr 1.92e-04 141k rows/s
+== epoch 1: monitor WP (holdout, all rows) 0.44262
+epoch 2 batch 20/613 loss 1.3441 aux 0.4443 lag 0.4980 ce 0.3979 lr 1.81e-04 142k rows/s
+epoch 2 batch 40/613 loss 1.3278 aux 0.4068 lag 0.5122 ce 0.3708 lr 1.70e-04 143k rows/s
+epoch 2 batch 60/613 loss 1.3631 aux 0.3899 lag 0.5106 ce 0.3667 lr 1.59e-04 141k rows/s
+epoch 2 batch 80/613 loss 1.3256 aux 0.3360 lag 0.4740 ce 0.3587 lr 1.49e-04 141k rows/s
+epoch 2 batch 100/613 loss 1.4235 aux 0.4167 lag 0.4927 ce 0.4019 lr 1.39e-04 140k rows/s
+epoch 2 batch 120/613 loss 1.3227 aux 0.3836 lag 0.5477 ce 0.3546 lr 1.29e-04 140k rows/s
+epoch 2 batch 140/613 loss 1.3593 aux 0.3680 lag 0.5370 ce 0.3720 lr 1.19e-04 140k rows/s
+epoch 2 batch 160/613 loss 1.2635 aux 0.4117 lag 0.4418 ce 0.3778 lr 1.10e-04 140k rows/s
+epoch 2 batch 180/613 loss 1.3968 aux 0.3892 lag 0.4651 ce 0.3736 lr 1.01e-04 139k rows/s
+epoch 2 batch 200/613 loss 1.3659 aux 0.3229 lag 0.4693 ce 0.3510 lr 9.21e-05 139k rows/s
+epoch 2 batch 220/613 loss 1.3385 aux 0.3750 lag 0.4802 ce 0.3599 lr 8.38e-05 139k rows/s
+epoch 2 batch 240/613 loss 1.3250 aux 0.4179 lag 0.4723 ce 0.3574 lr 7.58e-05 139k rows/s
+epoch 2 batch 260/613 loss 1.4014 aux 0.4211 lag 0.4922 ce 0.3559 lr 6.82e-05 139k rows/s
+epoch 2 batch 280/613 loss 1.3796 aux 0.3424 lag 0.4902 ce 0.3589 lr 6.09e-05 139k rows/s
+epoch 2 batch 300/613 loss 1.4246 aux 0.3420 lag 0.5623 ce 0.3513 lr 5.40e-05 139k rows/s
+epoch 2 batch 320/613 loss 1.4588 aux 0.3854 lag 0.4818 ce 0.3919 lr 4.75e-05 139k rows/s
+epoch 2 batch 340/613 loss 1.3518 aux 0.3883 lag 0.4706 ce 0.3735 lr 4.13e-05 138k rows/s
+epoch 2 batch 360/613 loss 1.4053 aux 0.3619 lag 0.5214 ce 0.3704 lr 3.56e-05 138k rows/s
+epoch 2 batch 380/613 loss 1.4281 aux 0.3593 lag 0.4978 ce 0.3540 lr 3.03e-05 138k rows/s
+epoch 2 batch 400/613 loss 1.3923 aux 0.4012 lag 0.5088 ce 0.3592 lr 2.54e-05 138k rows/s
+epoch 2 batch 420/613 loss 1.3127 aux 0.4196 lag 0.4576 ce 0.3977 lr 2.09e-05 138k rows/s
+epoch 2 batch 440/613 loss 1.2942 aux 0.4535 lag 0.4807 ce 0.4224 lr 1.68e-05 138k rows/s
+epoch 2 batch 460/613 loss 1.3348 aux 0.4016 lag 0.4875 ce 0.3744 lr 1.32e-05 138k rows/s
+epoch 2 batch 480/613 loss 1.3634 aux 0.3978 lag 0.4792 ce 0.3637 lr 9.96e-06 138k rows/s
+epoch 2 batch 500/613 loss 1.3836 aux 0.3453 lag 0.5361 ce 0.3641 lr 7.20e-06 137k rows/s
+epoch 2 batch 520/613 loss 1.2929 aux 0.4507 lag 0.4944 ce 0.3676 lr 4.88e-06 137k rows/s
+epoch 2 batch 540/613 loss 1.3707 aux 0.4175 lag 0.4745 ce 0.3784 lr 3.01e-06 137k rows/s
+epoch 2 batch 560/613 loss 1.3368 aux 0.3875 lag 0.4696 ce 0.3870 lr 1.59e-06 137k rows/s
+epoch 2 batch 580/613 loss 1.3549 aux 0.4035 lag 0.4882 ce 0.3792 lr 6.17e-07 137k rows/s
+epoch 2 batch 600/613 loss 1.3922 aux 0.4337 lag 0.4714 ce 0.4059 lr 9.77e-08 137k rows/s
+epoch 2 batch 613/613 loss 1.3311 aux 0.3670 lag 0.4536 ce 0.3719 lr 2.80e-09 137k rows/s
+== epoch 2: monitor WP (holdout, all rows) 0.44655
+Traceback (most recent call last):
+  File "/tmp/wunder/train/eval_torch.py", line 122, in <module>
+    print_summary(args.name, evaluate(predict, args.name, max_seqs=args.max_seqs, batch=args.batch))
+                             ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/wunder/src/evaluate.py", line 134, in evaluate
+    preds = predict(np.stack([s.X for s in chunk]))
+  File "/usr/local/lib/python3.13/dist-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+  File "/tmp/wunder/train/eval_torch.py", line 119, in predict
+    preds.append(output(m, torch.cat([inp, future_features(X, m.future)], -1) if m.future else inp))
+                 ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/wunder/train/eval_torch.py", line 80, in output
+    reg, _, top = m(x, None, return_top=True)
+                  ~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/dist-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/dist-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/tmp/wunder/train/train_gru.py", line 139, in forward
+    z, h = block(z, None if hidden is None else hidden[i])
+           ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/dist-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/dist-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/tmp/wunder/train/train_gru.py", line 80, in forward
+    return self.lstm(z, h) if hasattr(self, 'lstm') else self.gru(z, h)
+                                                         ~~~~~~~~^^^^^^
+  File "/usr/local/lib/python3.13/dist-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/dist-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/usr/local/lib/python3.13/dist-packages/torch/nn/modules/rnn.py", line 1449, in forward
+    result = _VF.gru(
+        input,
+    ...<7 lines>...
+        self.batch_first,
+    )
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 5.04 GiB. GPU 0 has a total capacity of 14.56 GiB of which 4.09 GiB is free. Including non-PyTorch memory, this process has 10.47 GiB memory in use. Of the allocated memory 5.74 GiB is allocated by PyTorch, and 4.61 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)

@@ -39,7 +39,7 @@ for stage in ([j for j in JOBS if not j[0].startswith(late)], [j for j in JOBS i
     for gpu, (run, args) in enumerate(stage):
         if run.startswith('eval:'):
             run = run[5:]
-            cmd = shlex.join(['python', '-u', 'train/eval_torch.py', *args, '--name', run, '--batch', '32'])
+            cmd = shlex.join(['python', '-u', 'train/eval_torch.py', *args, '--name', run, *([] if '--batch' in args else ['--batch', '32'])])
         elif run.startswith(('py:', 'post:')):  # any repo script: args = script path + its arguments (writes results/<run>*)
             run = run.split(':', 1)[1]
             cmd = shlex.join(['python', '-u', *args])

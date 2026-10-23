@@ -1,0 +1,10 @@
+== i1lead_s0,i1lead_s1 vs lr7e4_full,lr7e4_full_seed1
+  V1    per seed [-0.00023, 0.00055]  mean +0.00016  SE 0.00054  z_fix 0.4  z_gen 0.3
+  V2    per seed [-0.00038, 0.00183]  mean +0.00072  SE 0.00059  z_fix 1.5  z_gen 1.2
+  V3    per seed [0.0014, 0.00053]  mean +0.00097  SE 0.00071  z_fix 3.0  z_gen 1.4
+  V1t   per seed [-0.00039, 0.00046]  mean +0.00003  SE 0.00059  z_fix 0.1  z_gen 0.1
+  V1c0  per seed [-0.0005, 0.00029]  mean -0.00011  SE 0.00062  z_fix None  z_gen -0.2
+  V1c1  per seed [-6e-05, -0.0007]  mean -0.00038  SE 0.00038  z_fix None  z_gen -1.0
+  V1c2  per seed [0.00103, 0.00155]  mean +0.00129  SE 0.00060  z_fix None  z_gen 2.2
+  V1c3  per seed [-0.00079, 0.00123]  mean +0.00022  SE 0.00088  z_fix None  z_gen 0.2
+   verdict: REJECT
