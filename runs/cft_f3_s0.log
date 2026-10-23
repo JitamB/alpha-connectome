@@ -1,0 +1,80 @@
+epoch 0 batch 20/461 loss 1.6491 aux 0.9786 lag 1.5931 ce 0.7766 lr 1.58e-04 160k rows/s
+epoch 0 batch 40/461 loss 1.6018 aux 0.7114 lag 1.4197 ce 0.5347 lr 4.46e-04 162k rows/s
+epoch 0 batch 60/461 loss 1.4760 aux 0.6724 lag 1.0745 ce 0.4668 lr 6.72e-04 162k rows/s
+epoch 0 batch 80/461 loss 1.4135 aux 0.6542 lag 0.8486 ce 0.4277 lr 7.00e-04 161k rows/s
+epoch 0 batch 100/461 loss 1.4539 aux 0.6159 lag 0.7678 ce 0.4287 lr 6.99e-04 161k rows/s
+epoch 0 batch 120/461 loss 1.4173 aux 0.6029 lag 0.7605 ce 0.3943 lr 6.97e-04 161k rows/s
+epoch 0 batch 140/461 loss 1.4721 aux 0.5671 lag 0.7304 ce 0.3841 lr 6.95e-04 161k rows/s
+epoch 0 batch 160/461 loss 1.4204 aux 0.5333 lag 0.6704 ce 0.3797 lr 6.92e-04 161k rows/s
+epoch 0 batch 180/461 loss 1.4958 aux 0.4958 lag 0.6912 ce 0.3799 lr 6.88e-04 161k rows/s
+epoch 0 batch 200/461 loss 1.3694 aux 0.6026 lag 0.6347 ce 0.3797 lr 6.83e-04 161k rows/s
+epoch 0 batch 220/461 loss 1.3885 aux 0.6263 lag 0.6226 ce 0.4156 lr 6.77e-04 161k rows/s
+epoch 0 batch 240/461 loss 1.3574 aux 0.6572 lag 0.6201 ce 0.4066 lr 6.71e-04 161k rows/s
+epoch 0 batch 260/461 loss 1.4663 aux 0.4650 lag 0.6220 ce 0.3763 lr 6.64e-04 161k rows/s
+epoch 0 batch 280/461 loss 1.3996 aux 0.5513 lag 0.6305 ce 0.4131 lr 6.56e-04 161k rows/s
+epoch 0 batch 300/461 loss 1.4506 aux 0.5057 lag 0.5902 ce 0.4205 lr 6.48e-04 160k rows/s
+epoch 0 batch 320/461 loss 1.4806 aux 0.5650 lag 0.6123 ce 0.4141 lr 6.39e-04 160k rows/s
+epoch 0 batch 340/461 loss 1.4315 aux 0.5419 lag 0.6065 ce 0.4000 lr 6.29e-04 160k rows/s
+epoch 0 batch 360/461 loss 1.5332 aux 0.3989 lag 0.6159 ce 0.4013 lr 6.19e-04 160k rows/s
+epoch 0 batch 380/461 loss 1.3690 aux 0.4803 lag 0.6000 ce 0.3467 lr 6.08e-04 160k rows/s
+epoch 0 batch 400/461 loss 1.4392 aux 0.4663 lag 0.6328 ce 0.3902 lr 5.96e-04 159k rows/s
+epoch 0 batch 420/461 loss 1.4664 aux 0.5107 lag 0.6227 ce 0.3889 lr 5.84e-04 159k rows/s
+epoch 0 batch 440/461 loss 1.4750 aux 0.5018 lag 0.5839 ce 0.4058 lr 5.71e-04 159k rows/s
+epoch 0 batch 460/461 loss 1.3849 aux 0.5197 lag 0.5678 ce 0.3852 lr 5.58e-04 159k rows/s
+epoch 0 batch 461/461 loss 1.3039 aux 0.5970 lag 0.5533 ce 0.4117 lr 5.57e-04 159k rows/s
+== epoch 0: monitor WP (holdout, all rows) 0.40978
+epoch 1 batch 20/461 loss 1.4105 aux 0.4015 lag 0.5786 ce 0.3456 lr 5.44e-04 158k rows/s
+epoch 1 batch 40/461 loss 1.3912 aux 0.4102 lag 0.5328 ce 0.3554 lr 5.29e-04 159k rows/s
+epoch 1 batch 60/461 loss 1.3692 aux 0.4988 lag 0.5315 ce 0.3994 lr 5.15e-04 160k rows/s
+epoch 1 batch 80/461 loss 1.3804 aux 0.5110 lag 0.5802 ce 0.3760 lr 5.00e-04 159k rows/s
+epoch 1 batch 100/461 loss 1.3802 aux 0.5203 lag 0.5727 ce 0.3893 lr 4.85e-04 159k rows/s
+epoch 1 batch 120/461 loss 1.4250 aux 0.4910 lag 0.5281 ce 0.3725 lr 4.69e-04 160k rows/s
+epoch 1 batch 140/461 loss 1.4130 aux 0.4999 lag 0.5753 ce 0.3705 lr 4.53e-04 160k rows/s
+epoch 1 batch 160/461 loss 1.4803 aux 0.5095 lag 0.5484 ce 0.4010 lr 4.37e-04 160k rows/s
+epoch 1 batch 180/461 loss 1.4167 aux 0.5886 lag 0.5656 ce 0.4124 lr 4.21e-04 160k rows/s
+epoch 1 batch 200/461 loss 1.3676 aux 0.4958 lag 0.5717 ce 0.3853 lr 4.04e-04 160k rows/s
+epoch 1 batch 220/461 loss 1.3791 aux 0.5235 lag 0.5369 ce 0.3892 lr 3.88e-04 160k rows/s
+epoch 1 batch 240/461 loss 1.3589 aux 0.4224 lag 0.5157 ce 0.3793 lr 3.71e-04 160k rows/s
+epoch 1 batch 260/461 loss 1.3191 aux 0.4923 lag 0.5134 ce 0.3872 lr 3.54e-04 160k rows/s
+epoch 1 batch 280/461 loss 1.4029 aux 0.4407 lag 0.5632 ce 0.3694 lr 3.37e-04 160k rows/s
+epoch 1 batch 300/461 loss 1.4216 aux 0.4259 lag 0.5338 ce 0.3588 lr 3.21e-04 160k rows/s
+epoch 1 batch 320/461 loss 1.3742 aux 0.4548 lag 0.5416 ce 0.3934 lr 3.04e-04 160k rows/s
+epoch 1 batch 340/461 loss 1.4135 aux 0.5154 lag 0.5287 ce 0.4026 lr 2.88e-04 160k rows/s
+epoch 1 batch 360/461 loss 1.4438 aux 0.5172 lag 0.5009 ce 0.4218 lr 2.71e-04 160k rows/s
+epoch 1 batch 380/461 loss 1.3920 aux 0.3992 lag 0.5061 ce 0.3667 lr 2.55e-04 160k rows/s
+epoch 1 batch 400/461 loss 1.4217 aux 0.4622 lag 0.5732 ce 0.3822 lr 2.39e-04 160k rows/s
+epoch 1 batch 420/461 loss 1.4544 aux 0.3964 lag 0.5409 ce 0.3686 lr 2.23e-04 160k rows/s
+epoch 1 batch 440/461 loss 1.3702 aux 0.4407 lag 0.5011 ce 0.3772 lr 2.08e-04 160k rows/s
+epoch 1 batch 460/461 loss 1.4920 aux 0.4698 lag 0.5370 ce 0.3860 lr 1.93e-04 160k rows/s
+epoch 1 batch 461/461 loss 1.4545 aux 0.4520 lag 0.5326 ce 0.3766 lr 1.92e-04 160k rows/s
+== epoch 1: monitor WP (holdout, all rows) 0.42760
+epoch 2 batch 20/461 loss 1.3124 aux 0.4560 lag 0.5114 ce 0.3736 lr 1.77e-04 159k rows/s
+epoch 2 batch 40/461 loss 1.4031 aux 0.4970 lag 0.5304 ce 0.3645 lr 1.63e-04 161k rows/s
+epoch 2 batch 60/461 loss 1.4306 aux 0.4268 lag 0.4563 ce 0.3536 lr 1.49e-04 161k rows/s
+epoch 2 batch 80/461 loss 1.3986 aux 0.4596 lag 0.5497 ce 0.3978 lr 1.35e-04 161k rows/s
+epoch 2 batch 100/461 loss 1.3380 aux 0.4619 lag 0.4803 ce 0.3761 lr 1.22e-04 161k rows/s
+epoch 2 batch 120/461 loss 1.3202 aux 0.4488 lag 0.4706 ce 0.3867 lr 1.10e-04 161k rows/s
+epoch 2 batch 140/461 loss 1.3405 aux 0.4654 lag 0.4936 ce 0.3911 lr 9.81e-05 162k rows/s
+epoch 2 batch 160/461 loss 1.4444 aux 0.4658 lag 0.5410 ce 0.3842 lr 8.68e-05 162k rows/s
+epoch 2 batch 180/461 loss 1.3393 aux 0.4754 lag 0.5341 ce 0.3900 lr 7.61e-05 162k rows/s
+epoch 2 batch 200/461 loss 1.4365 aux 0.4030 lag 0.4938 ce 0.3611 lr 6.60e-05 162k rows/s
+epoch 2 batch 220/461 loss 1.3196 aux 0.4913 lag 0.4824 ce 0.3556 lr 5.65e-05 162k rows/s
+epoch 2 batch 240/461 loss 1.3940 aux 0.4513 lag 0.4931 ce 0.3789 lr 4.77e-05 162k rows/s
+epoch 2 batch 260/461 loss 1.4010 aux 0.4433 lag 0.4893 ce 0.3928 lr 3.96e-05 162k rows/s
+epoch 2 batch 280/461 loss 1.3017 aux 0.4624 lag 0.4828 ce 0.3675 lr 3.23e-05 161k rows/s
+epoch 2 batch 300/461 loss 1.2628 aux 0.5298 lag 0.4466 ce 0.4157 lr 2.56e-05 161k rows/s
+epoch 2 batch 320/461 loss 1.3713 aux 0.4015 lag 0.5426 ce 0.3353 lr 1.97e-05 161k rows/s
+epoch 2 batch 340/461 loss 1.3949 aux 0.4316 lag 0.4903 ce 0.3697 lr 1.45e-05 161k rows/s
+epoch 2 batch 360/461 loss 1.3714 aux 0.4263 lag 0.5045 ce 0.3767 lr 1.02e-05 161k rows/s
+epoch 2 batch 380/461 loss 1.3660 aux 0.4856 lag 0.4913 ce 0.3828 lr 6.54e-06 160k rows/s
+epoch 2 batch 400/461 loss 1.3934 aux 0.3828 lag 0.5358 ce 0.3520 lr 3.71e-06 160k rows/s
+epoch 2 batch 420/461 loss 1.3354 aux 0.4005 lag 0.4979 ce 0.3940 lr 1.68e-06 160k rows/s
+epoch 2 batch 440/461 loss 1.2807 aux 0.5148 lag 0.5153 ce 0.3955 lr 4.42e-07 160k rows/s
+epoch 2 batch 460/461 loss 1.3276 aux 0.4468 lag 0.4627 ce 0.3566 lr 3.70e-09 160k rows/s
+epoch 2 batch 461/461 loss 1.2601 aux 0.4109 lag 0.4560 ce 0.3472 lr 2.80e-09 160k rows/s
+== epoch 2: monitor WP (holdout, all rows) 0.44607
+== cft_f3_s0
+  V1: WP 0.680727  (t0 0.6773, t1 0.6841)  sigma 0.0062  seqs 1873
+  V2: WP 0.506252  (t0 0.5073, t1 0.5052)  sigma 0.0038  seqs 1873
+  V3: WP 0.446726  (t0 0.4463, t1 0.4472)  sigma 0.0067  seqs 800
+  eval time 156.3 s
