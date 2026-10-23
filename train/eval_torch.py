@@ -19,6 +19,7 @@ from evaluate import evaluate, print_summary  # noqa: E402
 from gpu_features import torch_features  # noqa: E402
 from train_gru import TRANSFORMS, GRUModel, decode_dist, future_features, make_atoms, make_class_atoms  # noqa: E402
 from shape_lookup import N_FEAT as SHAPE_N, features as shape_features, load_table  # noqa: E402
+import i1_lead  # noqa: E402
 
 
 def quantize(w, mode):
@@ -46,12 +47,14 @@ def load(run: Path, weights: str, device, quant='none'):
     conv = (cfg['conv'][0], cfg['conv'][1], cfg['conv'][2:]) if cfg.get('conv') else None
     future = cfg.get('future_inputs') or []
     table = load_table(ROOT / cfg['shape_table']) if cfg.get('shape_table') else None
+    i1 = i1_lead.load_tables(ROOT / cfg['i1_table'])[i1_lead.N_FOLDS] if cfg.get('i1_table') else None
     pair_atoms = make_class_atoms() if cfg.get('pair_weight') else None
-    model = GRUModel(TRANSFORMS[cfg['features']][0] + SHAPE_N * (table is not None) + 112 * len(future), cfg['hidden'], cfg['layers'], cfg['skip'], cfg.get('proj', 0), atoms, conv,
+    model = GRUModel(TRANSFORMS[cfg['features']][0] + SHAPE_N * (table is not None) + i1_lead.N_FEAT * (i1 is not None) + 112 * len(future), cfg['hidden'], cfg['layers'], cfg['skip'], cfg.get('proj', 0), atoms, conv,
                      cfg.get('cell', 'gru'), cfg.get('drop_blocks') or (), pair_atoms=pair_atoms)
     model.load_state_dict(torch.load(run / weights, map_location=device))
     model.future = future  # privileged teacher inputs (non-causal), see train_gru --future-inputs
     model.table = table    # exact-shape lookup inputs, see train_gru --shape-table
+    model.i1 = i1          # full i1 lead-lag table, see train_gru --i1-table
     if quant != 'none':
         quantize_model(model, quant)
     return model.to(device).eval(), cfg['features']
@@ -109,6 +112,9 @@ if __name__ == '__main__':
             inp = F if feature == 'engclock' else (F[..., :TRANSFORMS['eng'][0]] if feature == 'eng' else X)
             if m.table is not None:
                 L = np.stack([shape_features(x, *m.table)[0] for x in Xb])
+                inp = torch.cat([inp, torch.from_numpy(L).to(device)], -1)
+            if m.i1 is not None:
+                L = np.stack([i1_lead.features(x, *m.i1) for x in Xb])
                 inp = torch.cat([inp, torch.from_numpy(L).to(device)], -1)
             preds.append(output(m, torch.cat([inp, future_features(X, m.future)], -1) if m.future else inp))
         return torch.stack(preds).mean(0).float().cpu().numpy()

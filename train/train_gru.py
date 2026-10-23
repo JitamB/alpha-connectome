@@ -28,6 +28,7 @@ from features import N_FEATURES, CLOCK_FEATURES, batch_features, batch_features_
 from gpu_features import torch_features  # noqa: E402
 from mask_model import mask_prob  # noqa: E402
 from shape_lookup import N_FEAT as SHAPE_N, features as shape_features, load_table  # noqa: E402
+import i1_lead  # noqa: E402
 
 TRANSFORMS = {'raw': (112, None), 'eng': (N_FEATURES, batch_features),
               'engclock': (N_FEATURES + CLOCK_FEATURES, batch_features_clock)}
@@ -259,10 +260,12 @@ def read_batch(path, groups):
     return list(iter_sequences(path, tr)) + list(iter_sequences(VALID, va))
 
 
-def prefetch(groups_batches, transform=None, path=TRAIN, depth=1, table=None):
+def prefetch(groups_batches, transform=None, path=TRAIN, depth=1, table=None, i1=None):
     """Background thread that reads batches of sequences -> (X (B,T,F), Y (B,T,2), M (B,T)) numpy arrays;
     M = official is_scored mask (0/1) for valid sequences, -1 for train sequences (no mask).
-    table (--shape-table): the exact-shape lookup features are appended as the last SHAPE_N columns of X."""
+    table (--shape-table): the exact-shape lookup features are appended as the last SHAPE_N columns of X.
+    i1 (--i1-table, (tables, holdout set)): the i1 lead-lag features are appended as the last i1_lead.N_FEAT columns;
+    a train sequence reads its out-of-fold table, holdout and validation sequences the full one."""
     q = queue.Queue(depth)
 
     def work():
@@ -271,6 +274,10 @@ def prefetch(groups_batches, transform=None, path=TRAIN, depth=1, table=None):
             X = np.stack([s.X if transform is None else transform(s.X) for s in seqs])
             if table is not None:
                 X = np.concatenate([X, np.stack([shape_features(s.X, *table)[0] for s in seqs])], -1)
+            if i1 is not None:
+                folds = [i1_lead.fold_of(g, i1[1]) for g in groups if g < VALID_OFFSET] + \
+                        [i1_lead.N_FOLDS] * sum(g >= VALID_OFFSET for g in groups)
+                X = np.concatenate([X, np.stack([i1_lead.features(s.X, *i1[0][f]) for s, f in zip(seqs, folds)])], -1)
             M = np.stack([s.scored.astype(np.float32) if s.scored is not None else np.full(len(s.y), -1, np.float32)
                           for s in seqs])
             q.put((X, np.stack([s.y for s in seqs]), M))
@@ -288,12 +295,12 @@ def engineer(X, clock=False):
 
 
 @torch.no_grad()
-def monitor_score(model, groups, device, transform, gpu_features=False, batch=16, future=(), table=None, clock=False):
+def monitor_score(model, groups, device, transform, gpu_features=False, batch=16, future=(), table=None, clock=False, i1=None):
     """WP on all need_prediction rows of a train-holdout slice (model selection; valid stays untouched)."""
     model.eval()
     moments = []
     batches = [groups[i:i + batch] for i in range(0, len(groups), batch)]
-    for X, Y, _ in prefetch(batches, None if gpu_features else transform, table=table):
+    for X, Y, _ in prefetch(batches, None if gpu_features else transform, table=table, i1=i1):
         X = torch.from_numpy(X).to(device)
         F = engineer(X, clock=clock) if gpu_features else X
         if future:
@@ -378,6 +385,7 @@ def main():
                     help='weight of the training-only activity/range head (future i0 excursions, price changes, mean |y|)')
     ap.add_argument('--act-horizons', type=int, nargs='+', default=[100, 300])
     ap.add_argument('--shape-table', help='exact-shape lookup table (tools/build_shape_table.py): append its features as inputs')
+    ap.add_argument('--i1-table', help='i1 lead-lag tables (tools/build_i1_table.py): append their features as inputs')
     args = ap.parse_args()
     if args.gpu_features is None:
         args.gpu_features = args.device.startswith('cuda') and args.features in ('eng', 'engclock')
@@ -385,6 +393,8 @@ def main():
     assert not (args.future_inputs or args.teacher) or args.gpu_features, 'teacher paths need --gpu-features'
     assert not (args.shape_table and (args.future_inputs or args.teacher or args.conv)), 'shape table: plain recipe only'
     table = load_table(args.shape_table) if args.shape_table else None
+    assert not (args.i1_table and (args.shape_table or args.future_inputs or args.teacher or args.conv)), 'i1 table: plain recipe only'
+    i1 = (i1_lead.load_tables(args.i1_table), set(holdout_groups())) if args.i1_table else None
 
     args.out.mkdir(parents=True, exist_ok=True)
     torch.manual_seed(args.seed)
@@ -418,7 +428,7 @@ def main():
     atoms = torch.tensor(make_atoms())
     pair_atoms = make_class_atoms() if args.pair_weight else None
     conv = (args.conv[0], args.conv[1], args.conv[2:]) if args.conv else None
-    model = GRUModel(n_in + SHAPE_N * (table is not None) + 112 * len(args.future_inputs), args.hidden, args.layers, args.skip, args.proj,
+    model = GRUModel(n_in + SHAPE_N * (table is not None) + i1_lead.N_FEAT * (i1 is not None) + 112 * len(args.future_inputs), args.hidden, args.layers, args.skip, args.proj,
                      len(atoms) if args.dist_weight else 0, conv, args.cell, args.drop_blocks, args.dropout, pair_atoms)
     train_only = [g for g in groups if g < VALID_OFFSET] or train_groups()
     stats_groups = sorted(np.random.default_rng(args.seed + 1).choice(train_only, min(64, len(train_only)), replace=False).tolist())
@@ -427,6 +437,8 @@ def main():
         f = x if transform is None else transform(x)
         if table is not None:
             f = np.hstack([f, shape_features(x, *table)[0]])
+        if i1 is not None:
+            f = np.hstack([f, i1_lead.features(x, *i1[0][i1_lead.N_FOLDS])])
         if args.future_inputs:
             f = np.hstack([f, future_features(torch.from_numpy(x)[None], args.future_inputs)[0].numpy()])
         return f[WARMUP::10]
@@ -488,7 +500,7 @@ def main():
         order = np.random.default_rng(args.seed + epoch).permutation(groups)
         batches = [sorted(order[i:i + args.batch].tolist()) for i in range(0, len(order), args.batch)]
         t0, losses, aux_losses, lag_losses, dist_losses, teach_losses, act_losses, pair_losses, class_losses, delta_losses = time.time(), [], [], [], [], [], [], [], [], []
-        for b, (X, Y, M) in enumerate(prefetch(batches, None if args.gpu_features else transform, table=table)):
+        for b, (X, Y, M) in enumerate(prefetch(batches, None if args.gpu_features else transform, table=table, i1=i1)):
             X, Y = torch.from_numpy(X).to(device), torch.from_numpy(Y).to(device)
             batch_cls = np.asarray([class_of(g) for g in batches[b]], dtype=np.int64) \
                 if pair_atoms is not None or args.delta_weight else None
@@ -645,7 +657,7 @@ def main():
                 print(f'epoch {epoch} batch {b + 1}/{len(batches)} loss {np.mean(losses[-200:]):.4f}{aux_note} '
                       f'lr {sched.get_last_lr()[0]:.2e} {rate / 1e3:.0f}k rows/s', flush=True)
         score = monitor_score(model, monitor, device, transform, args.gpu_features, future=args.future_inputs, table=table,
-                              clock=args.features == 'engclock')
+                              clock=args.features == 'engclock', i1=i1)
         history.append({'epoch': epoch, 'loss': float(np.mean(losses)), 'monitor_wp': score, 'minutes': (time.time() - t0) / 60})
         print(f'== epoch {epoch}: monitor WP (holdout, all rows) {score:.5f}', flush=True)
         if score > best:
