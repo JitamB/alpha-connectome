@@ -1,0 +1,10 @@
+== cfd_s0,cfd_s1 vs lr7e4_full,lr7e4_full_seed1
+  V1    per seed [0.0009, 0.00062]  mean +0.00076  SE 0.00049  z_fix 1.7  z_gen 1.6
+  V2    per seed [0.00135, 0.00209]  mean +0.00172  SE 0.00056  z_fix 3.5  z_gen 3.1
+  V3    per seed [0.00264, 0.00281]  mean +0.00272  SE 0.00057  z_fix 8.6  z_gen 4.8
+  V1t   per seed [0.00084, 0.00062]  mean +0.00073  SE 0.00052  z_fix 1.6  z_gen 1.4
+  V1c0  per seed [0.00143, 0.00057]  mean +0.00100  SE 0.00049  z_fix None  z_gen 2.0
+  V1c1  per seed [0.0021, 0.00017]  mean +0.00113  SE 0.00030  z_fix None  z_gen 3.8
+  V1c2  per seed [0.00019, 0.00143]  mean +0.00081  SE 0.00045  z_fix None  z_gen 1.8
+  V1c3  per seed [0.00054, 0.00131]  mean +0.00092  SE 0.00068  z_fix None  z_gen 1.4
+   verdict: REJECT

@@ -905,3 +905,12 @@ Transition table from 1,500 train sequences per class (class 3: 2,207 types, pur
 - **Decision rule:** standard 2-seed rule (mean V1 ≥ +0.0009, no seed < −0.0006, no V2/V3 veto at −2 SE). If it passes, the next step is the pair `cfd_s0 + cfd_s1` vs `pair_lr7e4`, and then a train+valid refit (teachers would then also need valid folds). No weight sweep if it fails.
 - **Code checks (Mac, seconds):** a causal teacher loads through `load_teacher`, and its chunked forward equals the full forward (max diff 0.0); fold coverage gives each train sequence exactly its 2 fold teachers and a valid sequence all 8. The old half-teacher path is unchanged (one teacher per sequence, divide by 1); the default path has no teacher.
 - **Cost:** teachers: 4 jobs × 2 T4 in parallel over both accounts, ~12 min fetch + ~65 min train + ~10 min eval ≈ 1h30m. Students: 1 job, ~12 min + ~110 min (teacher forward passes add ~40%) + ~10 min ≈ 2h15m. Total ≈ 3h45m.
+
+### Result — 2 seeds: formally REJECT, but the most consistent positive in weeks (job theconqueror01/wunder-cfd; runs/cfd_judge.log)
+| | V1 | V2 | V3 | V1 c0 / c1 / c2 / c3 |
+|---|---:|---:|---:|---|
+| cfd_s0 / cfd_s1 | 0.68269 / 0.68282 | 0.51030 / 0.51066 | 0.44946 / 0.45107 | |
+| paired delta per seed | +0.00090 / +0.00062 | +0.00135 / +0.00209 | +0.00264 / +0.00281 | |
+| mean (SE) | **+0.00076** (0.00049) | **+0.00172** (z 3.1) | **+0.00272** (z 4.8) | +0.0010 / +0.0011 / +0.0008 / +0.0009 |
+The mean V1 gain misses the +0.0009 two-seed bar by 0.00014, so the pre-registered verdict is REJECT. But both seeds are positive on every view, V2 (unseen valid, all rows) is +0.0017 at z 3.1, and every class gains, class 3 included. This is a variance-type effect, so it may shrink after pairing.
+**Transparent extension, decided before seeing more data:** (a) a third seed `cfd_s2` vs `lr7e4_full_seed2`, ADOPT only if the 3-seed mean V1 is ≥ +0.0007 (the judge's 3-seed rule); (b) the pair `cfd_s0 + cfd_s1` vs `pair_lr7e4` on V1, because we ship pairs: proceed to a train+valid refit only if the pair gain is ≥ +0.0005 V1. If either fails, close the line.
