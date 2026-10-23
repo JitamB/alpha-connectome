@@ -1,0 +1,7 @@
+entry table {'rows': 8655000, 'keys': 1017, 'prior_S_D': [-1.1689792027729635, 0.008041941074523397]}
+G1_holdout_to_valid V1: all -0.00037  c3 -0.00145
+G1_holdout_to_valid V2: all -0.00036  c3 -0.00219
+G2_A_to_B V1: all -0.00009  c3 -0.00031
+G2_A_to_B V2: all -0.00021  c3 -0.00118
+G2_B_to_A V1: all -0.00023  c3 -0.00086
+G2_B_to_A V2: all -0.00015  c3 -0.00117

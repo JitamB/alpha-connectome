@@ -38,6 +38,7 @@ Runtime: M2 us/row from `src/check_submission.py`; projected scorer minutes = us
 | class-conditional joint tick-pair CE and metric-aware joint decoder | joint loss V1 −0.00012 / c3 −0.00063; decoded output V1 −0.00214 | 10-22 jointpair (2 seeds) | causal c3 transition representation, not a larger output distribution |
 | explicit book/trade timers, transition rates, and row-position inputs | V1 −0.00058 / c3 −0.00064 (2 seeds); V3 +0.00105 does not transfer | 10-23 clock | materially different causal state-transition inputs |
 | class-3 target-innovation (one-row delta) auxiliary loss | V1 −0.00003 / c3 −0.00005 (2 seeds) | 10-23 delta_c3 | a different causal target, not loss-weight tuning |
+| class-3 ordered entry-transition target table | c3 V1 −0.00145 G1 / −0.00031, −0.00086 G2 | 10-23 entry gate | a causal target definition beyond i0 state history |
 
 | date | name | model | V1 | V2 | V3 | M2 us/row (proj. min) | LB | notes |
 |---|---|---|---|---|---|---|---|---|
@@ -675,6 +676,22 @@ Both seeds miss the V1 criterion (−0.00069 / −0.00046) and both reduce class
 | paired vs `lr7e4_full` / `_seed1` | **−0.00003** (SE 0.00046) | +0.00021 | +0.00006 | **−0.00005** |
 
 The innovation loss produces no reliable movement overall or on class 3 (seed deltas −0.00041 / +0.00031 for c3). The recurrent base already encodes the usable one-row target dynamics; increasing the weight or broadening the loss would be an unmotivated weight sweep. Close this target-innovation formulation.
+
+## 2026-10-23: preregistration — class-3 entry-transition lookup gate (Experiment 4)
+- **Hypothesis:** the closed shape table used only the current i0 state. In class 3, targets change only at i0 state transitions and scored rows usually occur *after* a transition. The target may therefore depend on the ordered entry transition `(prior state at entry, current state)`, held causally throughout the resulting segment. This is a finite-state transition hypothesis, distinct from the rejected current-state table and from `gate_paths`, which encoded one-step transition deltas and window sums rather than the state level conditioned on its entry.
+- **Method:** build a train-only, class-3 table of count, mean tick sum `S`, and mean tick difference `D` for the causal entry-transition key. Append its frozen statistics to the train-only base pair predictions and fit a per-class ridge only on the designated G1/G2 fitting split. Test G1 holdout→valid plus both valid half directions. Non-c3 rows receive zeros, so the gate measures class-3 information without changing other classes.
+- **Decision rule:** advance to an input or table-based training experiment only if class-3 V1 improves by at least +0.002 in G1 and both G2 directions, with the same sign overall. Otherwise close the entry-transition table family. This is a discovery gate, not an eligible submission model.
+- **Cost:** Kaggle GPU inference for the saved base pair and CPU lookup/ridge work; fetch ~12 min and gate ~20 min, about 35 min total. No local parquet reads, model inference, or evaluation.
+
+### Result — REJECT (Kaggle job `theconqueror01/wunder-entry-gate-exp4`)
+
+| protocol | overall V1 change | class-3 V1 change | class-3 V2 change |
+|---|---:|---:|---:|
+| G1: holdout → valid | −0.00037 | **−0.00145** | −0.00219 |
+| G2: valid A → B | −0.00009 | **−0.00031** | −0.00118 |
+| G2: valid B → A | −0.00023 | **−0.00086** | −0.00117 |
+
+The table had 1,017 recurring class-3 entry-transition keys across 8.66M sampled train rows, so data sparsity is not the limiting explanation. Conditioning on the state of entry worsens every out-of-sample split and fails the required +0.002 c3 gate. Close entry-transition lookup features and do not turn them into a training input.
 
 The review (three independent specialists plus cross-review) had these key findings:
 - class 3 holds 66% of the residual error;
