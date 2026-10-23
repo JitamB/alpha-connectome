@@ -37,6 +37,7 @@ Runtime: M2 us/row from `src/check_submission.py`; projected scorer minutes = us
 | exact-shape lookup (S/D per exact i0 shape): post-hoc ridge, stacking gate, HistGB | V1 +0.00004 / +0.00001 (G1), HistGB worse | 10-22 corr, shape_gate | the GRU already has it |
 | class-conditional joint tick-pair CE and metric-aware joint decoder | joint loss V1 −0.00012 / c3 −0.00063; decoded output V1 −0.00214 | 10-22 jointpair (2 seeds) | causal c3 transition representation, not a larger output distribution |
 | explicit book/trade timers, transition rates, and row-position inputs | V1 −0.00058 / c3 −0.00064 (2 seeds); V3 +0.00105 does not transfer | 10-23 clock | materially different causal state-transition inputs |
+| class-3 target-innovation (one-row delta) auxiliary loss | V1 −0.00003 / c3 −0.00005 (2 seeds) | 10-23 delta_c3 | a different causal target, not loss-weight tuning |
 
 | date | name | model | V1 | V2 | V3 | M2 us/row (proj. min) | LB | notes |
 |---|---|---|---|---|---|---|---|---|
@@ -659,6 +660,21 @@ The class router is accurate on 99.41% / 99.15% of V1 sequences (98.75% / 98.63%
 | paired vs `lr7e4_full` / `_seed1` | **−0.00058** (SE 0.00056) | −0.00006 | +0.00105 | **−0.00064** |
 
 Both seeds miss the V1 criterion (−0.00069 / −0.00046) and both reduce class 3 (−0.00101 / −0.00028). The V3 gain shows the timers can fit train-period temporal structure, but its failure on clean V1 rules out this direct elapsed-time representation. Close these ten clock inputs as a class-3 route; do not tune timer scales or row-position parameterizations.
+
+## 2026-10-23: preregistration — class-3 target-innovation auxiliary (Experiment 3)
+- **Hypothesis:** class 3 has substantial row-time persistence (target autocorrelation 0.44 at 100 rows) but little event-time persistence. The standard level-only loss can match the dominant static cost component while leaving directional changes underconstrained. Add an auxiliary, |y|-weighted MSE on one-row target innovations `y[t] − y[t−1]`, only for class 3, so the recurrent representation must respond correctly to causal state transitions. This differs from the rejected sum loss (a level constraint), lag head (a target reconstruction task), pair CE (an output distribution), and clock features (inputs only).
+- **Primary comparison:** two train-only runs (`delta_c3_s0`, `delta_c3_s1`) paired against `lr7e4_full` / `_seed1`. Keep the adopted base recipe and add `--delta-weight 0.1 --delta-classes 3`. Primary view is clean V1; class-3 V1 is the required mechanism check. V2/V3 can veto.
+- **Decision rule:** candidate only at mean paired V1 ≥ +0.0009, neither seed below −0.0006, class 3 improves, and V2/V3 are not below −2 SE. Reject if class 3 is flat or down. No loss-weight sweep after rejection.
+- **No leakage and cost:** the innovation label uses only adjacent training targets; it is a training-only loss and has zero inference cost. Kaggle fetch ~12 min, two 3-epoch T4 runs in parallel ~75 min, evaluation ~10 min; target ~1h45m. The Mac performs orchestration only.
+
+### Result — REJECT (Kaggle jobs `theconqueror01/wunder-delta-c3-exp3`, `theconqueror01/wunder-delta-c3-eval`)
+
+| comparison | V1 | V2 | V3 | class 3 V1 |
+|---|---:|---:|---:|---:|
+| `delta_c3_s0` / `delta_c3_s1` scores | 0.68177 / 0.68217 | 0.50891 / 0.50902 | 0.44720 / 0.44801 | — |
+| paired vs `lr7e4_full` / `_seed1` | **−0.00003** (SE 0.00046) | +0.00021 | +0.00006 | **−0.00005** |
+
+The innovation loss produces no reliable movement overall or on class 3 (seed deltas −0.00041 / +0.00031 for c3). The recurrent base already encodes the usable one-row target dynamics; increasing the weight or broadening the loss would be an unmotivated weight sweep. Close this target-innovation formulation.
 
 The review (three independent specialists plus cross-review) had these key findings:
 - class 3 holds 66% of the residual error;

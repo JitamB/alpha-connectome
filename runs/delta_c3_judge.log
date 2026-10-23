@@ -1,0 +1,11 @@
+$ /usr/bin/python3 tools/judge.py --base lr7e4_full lr7e4_full_seed1 --new delta_c3_s0 delta_c3_s1
+== delta_c3_s0,delta_c3_s1 vs lr7e4_full,lr7e4_full_seed1
+  V1    per seed [-2e-05, -3e-05]  mean -0.00003  SE 0.00046  z_fix -0.1  z_gen -0.1
+  V2    per seed [-4e-05, 0.00045]  mean +0.00021  SE 0.00052  z_fix 0.4  z_gen 0.4
+  V3    per seed [0.00037, -0.00025]  mean +0.00006  SE 0.00043  z_fix 0.2  z_gen 0.1
+  V1t   per seed [-3e-05, 4e-05]  mean +0.00001  SE 0.00049  z_fix 0.0  z_gen 0.0
+  V1c0  per seed [0.00029, 0.00013]  mean +0.00021  SE 0.00018  z_fix None  z_gen 1.1
+  V1c1  per seed [0.0002, -0.00031]  mean -0.00006  SE 0.00022  z_fix None  z_gen -0.3
+  V1c2  per seed [-0.00064, -0.0006]  mean -0.00062  SE 0.00034  z_fix None  z_gen -1.8
+  V1c3  per seed [-0.00041, 0.00031]  mean -0.00005  SE 0.00043  z_fix None  z_gen -0.1
+   verdict: REJECT

@@ -347,6 +347,10 @@ def main():
                     help='per-row asset-class CE weight when --pair-weight is enabled')
     ap.add_argument('--sum-weight', type=float, default=0.0,
                     help='extra MSE on the predicted sum t0 + t1 (the cost-like part; clipped targets; 0 = off)')
+    ap.add_argument('--delta-weight', type=float, default=0.0,
+                    help='extra |y|-weighted MSE on one-row target innovations (0 = off)')
+    ap.add_argument('--delta-classes', type=int, nargs='+', default=[],
+                    help='restrict the innovation loss to these asset classes (empty = all)')
     ap.add_argument('--valid-groups', choices=list(VALID_SPLITS), default='none',
                     help='also train on valid.parquet sequences (A = row groups < 937, B = the rest)')
     ap.add_argument('--classes', type=int, nargs='+',
@@ -483,10 +487,11 @@ def main():
     for epoch in range(start_epoch, args.epochs):
         order = np.random.default_rng(args.seed + epoch).permutation(groups)
         batches = [sorted(order[i:i + args.batch].tolist()) for i in range(0, len(order), args.batch)]
-        t0, losses, aux_losses, lag_losses, dist_losses, teach_losses, act_losses, pair_losses, class_losses = time.time(), [], [], [], [], [], [], [], []
+        t0, losses, aux_losses, lag_losses, dist_losses, teach_losses, act_losses, pair_losses, class_losses, delta_losses = time.time(), [], [], [], [], [], [], [], [], []
         for b, (X, Y, M) in enumerate(prefetch(batches, None if args.gpu_features else transform, table=table)):
             X, Y = torch.from_numpy(X).to(device), torch.from_numpy(Y).to(device)
-            batch_cls = np.asarray([class_of(g) for g in batches[b]], dtype=np.int64) if pair_atoms is not None else None
+            batch_cls = np.asarray([class_of(g) for g in batches[b]], dtype=np.int64) \
+                if pair_atoms is not None or args.delta_weight else None
             if aux_head is not None:
                 A, V = aux_targets(X[..., :112], args.aux_horizons)  # raw block comes first in both layouts
                 if aux_std is None:
@@ -555,6 +560,24 @@ def main():
                     if mw is not None:
                         se = se * R[:, c + lo:c + args.chunk]
                     total = total + args.sum_weight * se.mean()
+                if args.delta_weight:
+                    # Target levels contain a class-3 component with strong row-lag persistence.  This loss makes
+                    # the causal response to a current-row state change explicit, without changing inference.
+                    first = max(lo, 1)
+                    if first < pred.shape[1]:
+                        use = torch.ones(len(pred), device=device, dtype=torch.bool)
+                        if args.delta_classes:
+                            use = torch.as_tensor(np.isin(batch_cls, args.delta_classes), device=device)
+                        if use.any():
+                            yy = Y[use, c + first:c + args.chunk].clamp(-CLIP, CLIP)
+                            dy = yy - Y[use, c + first - 1:c + args.chunk - 1].clamp(-CLIP, CLIP)
+                            dp = pred[use, first:] - pred[use, first - 1:-1]
+                            dw = yy.abs()
+                            if mw is not None:
+                                dw = dw * R[use, c + first:c + args.chunk, None]
+                            delta = (dw * (dp - dy) ** 2).sum() / dw.sum().clamp_min(1e-8)
+                            total = total + args.delta_weight * delta
+                            delta_losses.append(delta.item())
                 if model.dist_head is not None:
                     yc = Y[:, c + lo:c + args.chunk].clamp(-CLIP, CLIP)
                     logits = model.dist_head(top[:, lo:]).unflatten(-1, (2, len(atoms)))
@@ -617,7 +640,8 @@ def main():
                            (f' ce {np.mean(dist_losses[-200:]):.4f}' if dist_losses else '') + \
                            (f' teach {np.mean(teach_losses[-200:]):.4f}' if teach_losses else '') + \
                            (f' act {np.mean(act_losses[-200:]):.4f}' if act_losses else '') + \
-                           (f' pair {np.mean(pair_losses[-200:]):.4f} class {np.mean(class_losses[-200:]):.4f}' if pair_losses else '')
+                           (f' pair {np.mean(pair_losses[-200:]):.4f} class {np.mean(class_losses[-200:]):.4f}' if pair_losses else '') + \
+                           (f' delta {np.mean(delta_losses[-200:]):.4f}' if delta_losses else '')
                 print(f'epoch {epoch} batch {b + 1}/{len(batches)} loss {np.mean(losses[-200:]):.4f}{aux_note} '
                       f'lr {sched.get_last_lr()[0]:.2e} {rate / 1e3:.0f}k rows/s', flush=True)
         score = monitor_score(model, monitor, device, transform, args.gpu_features, future=args.future_inputs, table=table,
