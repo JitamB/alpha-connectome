@@ -1,0 +1,10 @@
+== pair_cfd vs pair_lr7e4
+  V1    per seed [0.00012]  mean +0.00012  SE 0.00065  z_fix 0.2  z_gen 0.2
+  V2    per seed [0.00043]  mean +0.00043  SE 0.00074  z_fix 0.6  z_gen 0.6
+  V3    per seed [0.00144]  mean +0.00144  SE 0.00065  z_fix 3.2  z_gen 2.2
+  V1t   per seed [0.00012]  mean +0.00012  SE 0.00069  z_fix 0.2  z_gen 0.2
+  V1c0  per seed [0.00021]  mean +0.00021  SE 0.00044  z_fix None  z_gen 0.5
+  V1c1  per seed [0.00033]  mean +0.00033  SE 0.00030  z_fix None  z_gen 1.1
+  V1c2  per seed [-0.00013]  mean -0.00013  SE 0.00045  z_fix None  z_gen -0.3
+  V1c3  per seed [0.00016]  mean +0.00016  SE 0.00068  z_fix None  z_gen 0.2
+   verdict: WEAK

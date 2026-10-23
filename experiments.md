@@ -41,6 +41,7 @@ Runtime: M2 us/row from `src/check_submission.py`; projected scorer minutes = us
 | class-3 ordered entry-transition target table | c3 V1 −0.00145 G1 / −0.00031, −0.00086 G2 | 10-23 entry gate | a causal target definition beyond i0 state history |
 | volume-queue imbalance (role-agnostic: 366 candidates, screen + stacking gate + HistGB) | screen below null and not replicated; gate V1 −0.0012 / −0.0023 / −0.0012 (c3 −0.0020 / −0.0087 / −0.0050) | 10-23 imbalance_probe | volume columns are a decorrelated basis, not a queue ladder |
 | i1 lead-lag as GRU input (out-of-fold i1 transition-type tables, 6 window-sum features) | V1 +0.00016 (seeds −0.00023 / +0.00055), c3 +0.00022, V3 +0.00097 | 10-23 i1lead (2 seeds) | label-derived i1 decoding adds nothing on clean V1 |
+| cross-fitted ensemble distillation (8 causal fold teachers → student) | single +0.00076 V1 (2 seeds, every class +), but the pair only +0.00012 vs pair_lr7e4 | 10-24 cfd | gains absorbed by pairing; only a larger shippable ensemble would help |
 
 | date | name | model | V1 | V2 | V3 | M2 us/row (proj. min) | LB | notes |
 |---|---|---|---|---|---|---|---|---|
@@ -914,3 +915,10 @@ Transition table from 1,500 train sequences per class (class 3: 2,207 types, pur
 | mean (SE) | **+0.00076** (0.00049) | **+0.00172** (z 3.1) | **+0.00272** (z 4.8) | +0.0010 / +0.0011 / +0.0008 / +0.0009 |
 The mean V1 gain misses the +0.0009 two-seed bar by 0.00014, so the pre-registered verdict is REJECT. But both seeds are positive on every view, V2 (unseen valid, all rows) is +0.0017 at z 3.1, and every class gains, class 3 included. This is a variance-type effect, so it may shrink after pairing.
 **Transparent extension, decided before seeing more data:** (a) a third seed `cfd_s2` vs `lr7e4_full_seed2`, ADOPT only if the 3-seed mean V1 is ≥ +0.0007 (the judge's 3-seed rule); (b) the pair `cfd_s0 + cfd_s1` vs `pair_lr7e4` on V1, because we ship pairs: proceed to a train+valid refit only if the pair gain is ≥ +0.0005 V1. If either fails, close the line.
+
+### Result — pair check FAILS: the gain is absorbed by pairing (job jitamb/wunder-cfd-pair; runs/pair_cfd_judge.log)
+| pair_cfd (cfd_s0 + cfd_s1) vs pair_lr7e4 | V1 | V2 | V3 | c0 / c1 / c2 / c3 |
+|---|---:|---:|---:|---|
+| scores | 0.68347 vs 0.68335 | 0.51192 | 0.45163 | |
+| delta | **+0.00012** (SE 0.00065) | +0.00043 | +0.00144 | +0.0002 / +0.0003 / −0.0001 / +0.0002 |
+Single students gain +0.00076 V1, but the pair of students gains only +0.00012 over the pair of plain models: the students imitate the same ensemble, so they agree more and averaging them adds less. That is the variance-type shrinkage pattern again, here almost complete. It misses the pre-declared +0.0005 pair bar, so **the distillation line is closed**; no train+valid refit. cfd_s2 (job wunder-cfd-s2) was already running; its result is recorded for completeness only and cannot reopen the line.
