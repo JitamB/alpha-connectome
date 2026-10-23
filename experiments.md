@@ -39,6 +39,7 @@ Runtime: M2 us/row from `src/check_submission.py`; projected scorer minutes = us
 | explicit book/trade timers, transition rates, and row-position inputs | V1 −0.00058 / c3 −0.00064 (2 seeds); V3 +0.00105 does not transfer | 10-23 clock | materially different causal state-transition inputs |
 | class-3 target-innovation (one-row delta) auxiliary loss | V1 −0.00003 / c3 −0.00005 (2 seeds) | 10-23 delta_c3 | a different causal target, not loss-weight tuning |
 | class-3 ordered entry-transition target table | c3 V1 −0.00145 G1 / −0.00031, −0.00086 G2 | 10-23 entry gate | a causal target definition beyond i0 state history |
+| volume-queue imbalance (role-agnostic: 366 candidates, screen + stacking gate + HistGB) | screen below null and not replicated; gate V1 −0.0012 / −0.0023 / −0.0012 (c3 −0.0020 / −0.0087 / −0.0050) | 10-23 imbalance_probe | volume columns are a decorrelated basis, not a queue ladder |
 
 | date | name | model | V1 | V2 | V3 | M2 us/row (proj. min) | LB | notes |
 |---|---|---|---|---|---|---|---|---|
@@ -799,3 +800,42 @@ ens2_all_tv_lr7e4 (LB 0.65655) stays primary.
 
 ### 2026-10-22: LB of ens2_all_tv_lr7e4_e4 (4-epoch pair)
 **LB 0.65702** (44m27s, 683 MB), +0.00047 over ens2_all_tv_lr7e4 (0.65655): a new best by a hair. On its own the gap is within the LB noise for near-identical packages, but it agrees in sign with the local pair evidence (V1 +0.0003, V2 +0.0019 (z 5.7), V3 +0.0025 (z 3.6)). It becomes co-primary.
+
+## 2026-10-23: default-path reproducibility check after the Codex edits (job theconqueror01/wunder-r3-repro-check)
+- **Why:** commits 15ec2c3..eb39f21 changed train/train_gru.py, train/eval_torch.py, train/gpu_features.py and src/features.py (new opt-in flags: pair/delta losses, clock inputs). A flag must leave the default path bit-identical.
+- **Run:** `repro2_lr7e4_full` = lr7e4_full recipe, seed 0, all new flags off, code at commit eb39f21 (provenance dirty_files 0).
+- **Pass:** `best.pt` sha256 = d2e62450b9cf6d05dec276794fa0e8b23ce71ae181ca128f4711440fcf61cc21 (same as lr7e4_full and repro_lr7e4_full). Fail: find the diff in the default path before any further run.
+- **Cost:** fetch ~12 min, 3-epoch train ~75 min, eval ~10 min; launched 09:58 IST, ready ~11:40 IST. One GPU only.
+
+## 2026-10-23: preregistration — queue-imbalance probe for the class-3 direction part (tools/imbalance_probe.py)
+- **Hypothesis:** queue imbalance at the best levels is the textbook predictor of the next tick direction for coarse-tick assets, and the direction part (corr ~0.39 on class 3) is the bottleneck. The GRU sees every volume column and its diff linearly, but never a role-aware, nonlinear imbalance feature. Caveat found while designing it: docs say indices are identifiers, not depth levels, and the price columns have mixed-sign correlations (rotated-basis look), so the best-level queues may not be literal columns. The probe is role-agnostic.
+- **Not a repeat:** closed lines used price/trade paths, shape lookups, timers, target tables and loss variants. None built volume-imbalance candidates or screened volume columns against the GRU residual.
+- **Method (Kaggle GPU, base = lr7e4_full + lr7e4_full_seed1 pair, train-only):**
+  1. Residual screen: 366 candidates (44 raw volumes, 44 five-row changes, 2x121 bid-minus-ask pairs, 36 permutation-invariant side aggregates) vs the pair's direction and cost residual, |y|-weighted, on holdout (V3 rows) and valid (scored rows), per class. Null = the same statistic with (y, p, mask) rolled by a random offset (30 replicates).
+  2. Transition lift of each volume column (P(i0 shape change in next 5 rows | z>1.28 vs z<-1.28)) and the within-sequence correlation structure of the 22 i0 volume and price columns.
+  3. Stacking gate (ridge on [pred, 36 aggregates], G1 holdout->valid, G2 both halves) and HistGB, per class.
+- **Decision rule:** advance to a GRU input experiment only if class-3 V1 improves >= +0.002 in G1 and both G2 directions, or a screen candidate beats the null max by >= 2x with the same sign on holdout and valid. Otherwise close volume-imbalance as a class-3 route (the information is then already in the GRU).
+- **Unit test (Mac, random data, seconds):** a planted pair signal is recovered at corr 0.383 vs null max 0.034.
+- **Cost:** CPU-light code; Kaggle fetch ~12 min + probe ~30 min; launched after the repro job, account theconqueror01 (second GPU).
+
+### Result — REJECT (Kaggle job theconqueror01/wunder-r3-imbalance, finished ~10:30 IST; results/imbalance_probe.json)
+**Residual screen.** Nothing clears the permutation null, and nothing replicates between views.
+| view, class | null max \|corr\| (30 rolls) | best direction candidate | best cost candidate |
+|---|---:|---|---|
+| holdout, c3 | 0.069 | i0 v8-v17 +0.045 | i1 ask mean +0.064 |
+| valid scored, c3 | 0.064 | i0 bid-ask mean −0.051 | i0 v0-v21 +0.067 |
+| holdout, c0 | 0.052 | i0 bid-ask min −0.074 | i1 bid std −0.060 |
+| valid scored, c0 | 0.030 | i0 bid-ask std +0.049 | i0 v18 +0.041 |
+The top names differ between holdout and valid, and the sign flips for the aggregate bid-ask mean. The only candidates above the null are class 0, with |corr| <= 0.074 and no replication, so they are not an imbalance effect. Rule needed 2x the null max with the same sign on both views: not met.
+
+**Stacking gate (ridge on [pred, 36 aggregates] vs ridge on pred):**
+| protocol | V1 all | V1 c3 | V2 c3 |
+|---|---:|---:|---:|
+| G1 holdout -> valid | −0.00123 | −0.0020 | −0.0017 |
+| G2 A -> B | −0.00230 | −0.0087 | −0.0133 |
+| G2 B -> A | −0.00115 | −0.0050 | −0.0172 |
+HistGB on [pred, aggregates, class]: V1 0.68175 vs 0.68334 for the bare pair (−0.0016). The gate needed +0.002 on class 3; it is negative in all three protocols and overfits hardest within valid halves.
+
+**Structure.** The 22 i0 volume columns are uncorrelated within a sequence (mean pairwise corr 0.01; range −0.33…+0.29; 51% negative within the bid block), so they are not a ladder of neighbouring queue levels (that would give positive neighbour correlations). The 11 price columns have pairwise corr from −0.99 to +1.00 within the bid block. This looks like a rotated/decorrelated basis, consistent with the docs' "index is an identifier, not a depth level". Literal best-level queue imbalance cannot be built from single columns. The transition-lift table is too noisy to use: z > 1.28 is rare for most columns, so rates like 1.0 vs 0.0 rest on a handful of rows.
+
+**Conclusion.** Close volume imbalance as a class-3 route: role-agnostic imbalance aggregates add nothing to the GRU pair, and the column structure says the best-level queues are not recoverable as single columns. Remaining untested: i1 lead-lag as a GRU input (old gate +0.0010 to +0.0016 on class 3), and recovering a hidden linear basis of the volume/price columns (not pursued).
